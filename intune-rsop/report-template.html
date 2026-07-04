@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+:root{
+  --bg:#f4f6f9;--card:#ffffff;--ink:#16202e;--muted:#5f6b7c;--line:#dfe4ea;--accent:#2458d6;--accent-ink:#ffffff;
+  --chip:#eaeef4;--red:#b42323;--redbg:#fbe9e9;--amber:#8a5c00;--amberbg:#fff2cf;--green:#156f36;--greenbg:#e4f5ea;
+  --blue:#134a9b;--bluebg:#e7effc;--mark:#ffe89c;--focus:#16202e;
+}
+html[data-theme="dark"]{
+  --bg:#10131a;--card:#191e29;--ink:#e7eaf1;--muted:#96a0b1;--line:#2a3140;--accent:#7aa2ff;--accent-ink:#0d1524;
+  --chip:#232a38;--red:#ff8484;--redbg:#3b2020;--amber:#e8b64c;--amberbg:#3a3220;--green:#5cd991;--greenbg:#1c3527;
+  --blue:#8ab4ff;--bluebg:#1d2b45;--mark:#7a5d00;--focus:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  html:not([data-theme]){
+    --bg:#10131a;--card:#191e29;--ink:#e7eaf1;--muted:#96a0b1;--line:#2a3140;--accent:#7aa2ff;--accent-ink:#0d1524;
+    --chip:#232a38;--red:#ff8484;--redbg:#3b2020;--amber:#e8b64c;--amberbg:#3a3220;--green:#5cd991;--greenbg:#1c3527;
+    --blue:#8ab4ff;--bluebg:#1d2b45;--mark:#7a5d00;--focus:#ffffff;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;font:13.5px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);padding:18px 22px 40px}
+h1{font-size:19px;margin:0}
+.sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.controls{position:sticky;top:0;z-index:30;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select,input[type=text]{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;max-width:230px}
+input[type=text]{flex:1;min-width:220px;max-width:none}
+.btn{background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;font-weight:600}
+.btn.ghost{background:var(--chip);color:var(--ink);font-weight:500}
+label.chk{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12.5px;white-space:nowrap;cursor:pointer}
+.tabs{display:flex;gap:2px;margin-top:10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tab{padding:7px 14px;cursor:pointer;border:none;background:none;color:var(--muted);font-size:13px;border-bottom:2px solid transparent}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{background:var(--chip);border-radius:9px;padding:0 7px;font-size:11px;margin-left:4px}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.8px}
+th{position:sticky;top:0;background:var(--card);text-align:left;padding:7px 9px;border-bottom:2px solid var(--line);color:var(--muted);font-weight:600;white-space:nowrap;cursor:pointer;user-select:none}
+th .arr{opacity:.6;font-size:10px}
+td{padding:5px 9px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
+tr:hover td{background:var(--chip)}
+.rowlink{cursor:pointer}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.b-conflict{background:var(--redbg);color:var(--red)}
+.b-dup{background:var(--chip);color:var(--muted);font-weight:500}
+.b-applies,.b-assigned{background:var(--greenbg);color:var(--green)}
+.b-excluded,.b-filteredout,.b-notassigned{background:var(--redbg);color:var(--red)}
+.b-unknown,.b-reportedonly{background:var(--amberbg);color:var(--amber)}
+.small{color:var(--muted);font-size:11.5px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.8px}
+mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
+.vwrap{max-height:3.1em;overflow:hidden;position:relative;cursor:default}
+.vwrap.expandable{cursor:pointer}
+.vwrap.expandable::after{content:"⌄ more";position:absolute;right:0;bottom:0;background:var(--card);color:var(--accent);font-size:10.5px;padding-left:8px}
+tr:hover .vwrap.expandable::after{background:var(--chip)}
+.vwrap.open{max-height:none}
+.vwrap.open::after{content:"⌃ less"}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{font-size:22px;display:block;line-height:1.2}
+.stat span{color:var(--muted);font-size:12px}
+.stat.warn b{color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:3px 10px;font-size:12.8px}
+.kv .k{color:var(--muted)}
+.conf-card{border:1px solid var(--line);border-left:4px solid var(--red);border-radius:8px;padding:9px 13px;margin-bottom:9px;background:var(--card)}
+.conf-card h3{margin:0 0 4px;font-size:13.5px}
+.conf-src{display:flex;justify-content:space-between;gap:14px;padding:3px 0;font-size:12.5px;border-top:1px dashed var(--line)}
+.conf-src b{text-align:right}
+.warnrow{padding:4px 0;border-bottom:1px dashed var(--line);font-size:12.3px}
+.warnrow .lvl-error{color:var(--red);font-weight:700}
+.warnrow .lvl-warn{color:var(--amber);font-weight:700}
+.warnrow .lvl-info{color:var(--muted)}
+.linkish{color:var(--accent);cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+.mx-y{color:var(--green);font-weight:700}.mx-n{color:var(--red);font-weight:700}.mx-q{color:var(--amber);font-weight:700}.mx-o{color:var(--muted)}
+#toTop{position:fixed;right:18px;bottom:18px;display:none;z-index:40}
+.footer{color:var(--muted);font-size:11.5px;margin-top:18px}
+.chipbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chipbar.grouped{flex-direction:column;gap:11px;align-items:stretch;margin-top:10px}
+.chipgroup{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chiphead{width:100%;font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin:0 0 -1px}
+.tchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;line-height:1.15;min-height:32px;cursor:pointer}
+.tchip .st{width:11px;text-align:center;font-weight:800;flex:0 0 auto}
+.tchip .ico{font-size:14px;line-height:1}
+.tchip:hover{border-color:var(--accent)}
+.tchip.auto{border-color:var(--accent);border-width:1.5px;color:var(--accent);background:var(--card);font-weight:600}
+.tchip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.tchip.off{opacity:.5}
+.tchip.off .lbl{text-decoration:line-through}
+.tchip:focus-visible,.btn:focus-visible,.btn.ghost:focus-visible,.tab:focus-visible,.xbtn:focus-visible,th:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.flag{color:var(--red);font-weight:700;cursor:help}
+.flag-pill{display:inline-flex;align-items:center;gap:3px;background:var(--redbg);color:var(--red);border-radius:999px;padding:1px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+.sus-eyebrow{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--red);margin-bottom:4px}
+.sus-card{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:11px 14px;margin-bottom:9px;background:var(--card);cursor:pointer}
+.sus-card.unknown{border-left-color:var(--amber)}
+.sus-card.culprit{border-left-color:var(--red)}
+.sus-card.primary{border-left-width:5px;box-shadow:0 0 0 1px var(--red) inset}
+.sus-card.sel{outline:2px solid var(--accent)}
+.sus-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sus-name{font-size:15px;font-weight:600;color:var(--ink)}
+.sus-meta{color:var(--muted);font-size:11.5px;margin-top:3px}
+.sus-divider{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:15px 2px 9px;border-top:1px solid var(--line);padding-top:11px}
+.mt{display:inline-block;background:var(--bluebg);color:var(--blue);border-radius:4px;padding:1px 6px;font-size:11.5px;margin-right:4px;white-space:nowrap}
+.hintwrap{margin-top:14px;border-top:1px solid var(--line);padding-top:11px}
+.hintwrap>summary{cursor:pointer;font-size:12.5px;color:var(--muted);font-weight:600;list-style:none;user-select:none}
+.hintwrap>summary::-webkit-details-marker{display:none}
+.hintwrap>summary::before{content:"▸ ";color:var(--accent)}
+.hintwrap[open]>summary::before{content:"▾ "}
+.hintbox{border-left:3px solid var(--blue);background:transparent;padding:5px 12px;font-size:12.5px;margin-top:11px}
+.hintbox b{color:var(--blue)}
+.hintbox .hbody{margin-top:3px}
+.hintbox ol{margin:5px 0 0;padding-left:18px}
+.hintbox ol li{margin:2px 0}
+.iv-lead{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.iv-intro{font-size:11px;color:var(--muted);margin:11px 0 0;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+#insp{position:fixed;top:0;right:0;height:100%;width:min(480px,94vw);background:var(--card);border-left:1px solid var(--line);box-shadow:-10px 0 28px rgba(0,0,0,.22);z-index:60;display:none;flex-direction:column}
+#insp.open{display:flex}
+#insp .ihead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+#insp .ihead h2{margin:5px 0 0;font-size:15px;line-height:1.3;word-break:break-word}
+#insp .ibody{padding:4px 16px 24px;overflow-y:auto}
+#insp h4{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+#insp .ival{white-space:pre-wrap;word-break:break-word;background:var(--chip);border-radius:6px;padding:8px 10px;font-size:12.5px;max-height:300px;overflow:auto}
+#insp ul{margin:4px 0;padding-left:18px}
+#insp li{margin:2px 0;font-size:12.5px}
+#insp table{font-size:12.3px}
+#insp .xbtn{background:none;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:2px 6px;line-height:1}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <h1>🔍 Intune Lens</h1>
+    <div class="sub" id="subline"></div>
+  </div>
+  <div class="row">
+    <button class="btn ghost" id="themeBtn" title="Toggle light/dark">◐ theme</button>
+  </div>
+</div>
+
+<div class="cards" id="statCards"></div>
+
+<div class="card controls">
+  <div class="row">
+    <select id="devSel" title="Device"></select>
+    <input type="text" id="q" placeholder="Search the report…  a|b = either, &quot;exact phrase&quot;, space = AND  (press / to focus)">
+    <select id="famSel"><option value="">All policy types</option></select>
+    <select id="catSel"><option value="">All categories</option></select>
+    <select id="polSel"><option value="">All policies</option></select>
+    <label class="chk" title="Settings &amp; Policies tabs: only items involved in a CONFLICT"><input type="checkbox" id="confOnly"> conflicts only</label>
+    <label class="chk" title="Settings tab only: hide rows where several policies set the same value"><input type="checkbox" id="hideDup"> hide duplicates</label>
+    <button class="btn ghost" id="clearBtn">Clear</button>
+    <button class="btn" id="csvBtn" title="CSV of the currently filtered settings">⬇ CSV (filtered)</button>
+  </div>
+  <div class="small" id="filterNote" style="margin-top:8px;display:none"></div>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="investigate">Investigate <span class="n" id="nInv" style="display:none"></span></button>
+    <button class="tab" data-tab="settings">Settings <span class="n" id="nSettings"></span></button>
+    <button class="tab" data-tab="policies">Policies <span class="n" id="nPolicies"></span></button>
+    <button class="tab" data-tab="conflicts">Conflicts <span class="n" id="nConflicts"></span></button>
+    <button class="tab" data-tab="matrix" id="matrixTab" style="display:none">Device matrix</button>
+  </div>
+</div>
+
+<div id="pane-overview">
+  <div class="card" id="ovInvestigate">
+    <b style="font-size:13px">🔎 Find the cause of a problem</b>
+    <span class="small"> — pick a topic to hunt for the policy responsible, or open <span class="linkish" onclick="showTab('investigate')">Investigate</span> to describe it in your own words:</span>
+    <div class="chipbar grouped" id="ovChips"></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin:0 0 8px;font-size:14px">Device</h3>
+      <div class="kv" id="devInfo"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 8px;font-size:14px">Settings by policy type</h3>
+      <div class="tblwrap"><table id="famTable"><thead><tr><th>Policy type</th><th>Policies</th><th>Settings</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+  <div class="card" id="ovConflicts"></div>
+  <div class="card" id="ovWarnings"></div>
+</div>
+
+<div id="pane-investigate" style="display:none">
+  <div class="card">
+    <div class="row">
+      <input type="text" id="ivQ" placeholder="Describe the problem…  e.g. 'usb blocked' or 'copilot uninstalls itself'">
+      <button class="btn ghost" id="ivClear">Clear</button>
+    </div>
+    <div class="iv-intro">Or jump to a topic</div>
+    <div class="chipbar grouped" id="ivChips" role="group" aria-label="Problem topic filters"></div>
+    <div id="ivExplain" style="margin-top:12px"></div>
+    <div class="small" id="ivScope" style="margin-top:7px;display:none"></div>
+  </div>
+  <div id="ivSuspects"></div>
+  <div id="ivHints"></div>
+  <div class="card" id="ivTableCard" style="display:none">
+    <h3 style="margin:0 0 8px;font-size:14px">Matching settings</h3>
+    <div class="tblwrap"><table id="tblIv">
+      <thead><tr><th title="⚑ = value looks restrictive for this setting name (heuristic - verify)"></th><th>Setting</th><th>Value</th><th>Policy</th><th>Status</th><th>Type</th><th>Matched on</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="small" id="ivRowCount" style="margin-top:6px"></div>
+  </div>
+  <div class="card" id="ivShadowCard" style="display:none"></div>
+</div>
+
+<div id="pane-settings" style="display:none">
+  <div class="card">
+    <div class="tblwrap"><table id="tblSettings">
+      <thead><tr>
+        <th data-k="Category">Category <span class="arr"></span></th>
+        <th data-k="Setting">Setting <span class="arr"></span></th>
+        <th data-k="Value">Value <span class="arr"></span></th>
+        <th data-k="PolicyName">Policy <span class="arr"></span></th>
+        <th data-k="FamilyLabel">Type <span class="arr"></span></th>
+        <th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="small" id="rowCount" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<div id="pane-policies" style="display:none">
+  <div class="card">
+    <div class="tblwrap"><table id="tblPolicies">
+      <thead><tr>
+        <th data-k="Status">Status <span class="arr"></span></th>
+        <th data-k="Name">Policy <span class="arr"></span></th>
+        <th data-k="FamilyLabel">Type <span class="arr"></span></th>
+        <th data-k="Detail">Template / baseline <span class="arr"></span></th>
+        <th data-k="SettingCount"># <span class="arr"></span></th>
+        <th data-k="Modified">Modified <span class="arr"></span></th>
+        <th data-k="Reported">Device reported <span class="arr"></span></th>
+        <th data-k="Via">Assigned / applies via <span class="arr"></span></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="small" id="polCount" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<div id="pane-conflicts" style="display:none"><div id="confList"></div></div>
+
+<div id="pane-matrix" style="display:none">
+  <div class="card">
+    <div class="small" style="margin-bottom:8px">✓ applies &nbsp; ✕ excluded / filtered out &nbsp; ? unknown &nbsp; R reported-only &nbsp; · not targeted</div>
+    <div class="tblwrap"><table id="tblMatrix"><thead></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+<aside id="insp" aria-label="Details">
+  <div class="ihead"><div id="inspHead" style="min-width:0"></div><button class="xbtn" id="inspClose" title="Close (Esc)">✕</button></div>
+  <div class="ibody" id="inspBody"></div>
+</aside>
+
+<button class="btn" id="toTop">↑ top</button>
+<div class="footer" id="footer"></div>
+
+<script>
+const DATA = __DATA__;
+let cur = 0;
+let sortS = {k:"", d:1}, sortP = {k:"", d:1};
+
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rxEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+function parseQuery(q){
+  // space-separated tokens are ANDed; a|b within a token means either; "quoted phrases" stay whole
+  const groups=[]; const re=/"([^"]+)"|(\S+)/g; let m;
+  while((m=re.exec(q||""))){
+    const tok=(m[1]!==undefined?m[1]:m[2]).toLowerCase();
+    const alts=tok.split("|").map(s=>s.trim()).filter(Boolean);
+    if(alts.length) groups.push(alts);
+  }
+  return groups;
+}
+const matchesGroups=(hay,groups)=>groups.every(g=>g.some(a=>hay.includes(a)));
+function hl(text, q){
+  const e = esc(text);
+  let terms = Array.isArray(q) ? q : (q ? [q] : []);
+  terms = terms.filter(Boolean);
+  if(!terms.length) return e;
+  try { return e.replace(new RegExp("("+terms.map(t=>rxEsc(esc(t))).join("|")+")","gi"),"<mark>$1</mark>"); } catch(err){ return e; }
+}
+const D = () => DATA.devices[cur];
+const SH = () => (D().Shadow||[]);
+
+/* ---------- shared filter state -----------------------------------------------------------
+   One filter bar drives the whole report: Settings, Policies, Conflicts and Investigate all
+   evaluate the same state. Tab-specific controls stay explicit: Investigate keeps its own
+   problem-description search, "hide duplicates" only affects Settings rows, and Investigate
+   ignores the two conflict/duplicate display toggles (they would hide the culprits). */
+let POLBYID={}, CONFBYKEY={}, KEYCAT={}, MAPS={cats:{},conf:{}};
+let lastSettingsRows=[], ivRows=[], ivShRows=[];
+
+function rebuildIndex(){
+  const d=D();
+  POLBYID={}; d.Policies.forEach(p=>POLBYID[p.PolicyId]=p);
+  CONFBYKEY={}; d.Conflicts.forEach(c=>{ if(c.Key) CONFBYKEY[c.Key]=c; });
+  KEYCAT={}; MAPS={cats:{},conf:{}};
+  d.Settings.forEach(s=>{
+    if(s.Key&&!(s.Key in KEYCAT)) KEYCAT[s.Key]=s.Category||"";
+    (MAPS.cats[s.PolicyId]=MAPS.cats[s.PolicyId]||new Set()).add(s.Category||"");
+    if(s.Conflict==="CONFLICT") MAPS.conf[s.PolicyId]=true;
+  });
+  SH().forEach(s=>{ (MAPS.cats[s.PolicyId]=MAPS.cats[s.PolicyId]||new Set()).add(s.Category||""); });
+}
+
+function filterState(){
+  return {
+    groups: parseQuery(document.getElementById("q").value),
+    fam: document.getElementById("famSel").value,
+    cat: document.getElementById("catSel").value,
+    pol: document.getElementById("polSel").value,
+    confOnly: document.getElementById("confOnly").checked,
+    hideDup: document.getElementById("hideDup").checked
+  };
+}
+const filtersActive=f=>!!(f.groups.length||f.fam||f.cat||f.pol||f.confOnly||f.hideDup);
+
+function settingInScope(s,f){
+  if(f.fam&&s.FamilyLabel!==f.fam)return false;
+  if(f.cat&&s.Category!==f.cat)return false;
+  if(f.pol&&s.PolicyId!==f.pol)return false;
+  if(f.confOnly&&s.Conflict!=="CONFLICT")return false;
+  if(f.hideDup&&s.Conflict==="Duplicate")return false;
+  if(f.groups.length){
+    const hay=(s.Category+" "+s.Setting+" "+s.Value+" "+s.PolicyName+" "+s.FamilyLabel+" "+(s.Via||"")).toLowerCase();
+    if(!matchesGroups(hay,f.groups))return false;
+  }
+  return true;
+}
+function shadowInScope(s,f){
+  if(f.fam&&s.FamilyLabel!==f.fam)return false;
+  if(f.cat&&s.Category!==f.cat)return false;
+  if(f.pol&&s.PolicyId!==f.pol)return false;
+  if(f.groups.length){
+    const hay=(s.Category+" "+s.Setting+" "+s.Value+" "+s.PolicyName+" "+s.FamilyLabel+" "+(s.Via||"")).toLowerCase();
+    if(!matchesGroups(hay,f.groups))return false;
+  }
+  return true;
+}
+function policyInScope(p,f){
+  if(f.fam&&p.FamilyLabel!==f.fam)return false;
+  if(f.pol&&p.PolicyId!==f.pol)return false;
+  if(f.cat&&!(MAPS.cats[p.PolicyId]&&MAPS.cats[p.PolicyId].has(f.cat)))return false;
+  if(f.confOnly&&!MAPS.conf[p.PolicyId])return false;
+  if(f.groups.length){
+    const hay=(p.Name+" "+p.FamilyLabel+" "+(p.Intent||"")+" "+p.Via+" "+(p.Detail||"")+" "+(p.Desc||"")+" "+(p.Assignment||"")).toLowerCase();
+    if(!matchesGroups(hay,f.groups))return false;
+  }
+  return true;
+}
+function conflictInScope(c,f){
+  if(f.pol&&!c.Sources.some(s=>String(s.PolicyId||"")===f.pol))return false;
+  if(f.fam&&!c.Sources.some(s=>{const p=POLBYID[s.PolicyId];return p&&p.FamilyLabel===f.fam;}))return false;
+  if(f.cat&&KEYCAT[c.Key]!==f.cat)return false;
+  if(f.groups.length){
+    const hay=(c.Setting+" "+c.Sources.map(s=>s.Policy+" "+s.Value).join(" ")).toLowerCase();
+    if(!matchesGroups(hay,f.groups))return false;
+  }
+  return true;
+}
+function filteredSettings(){ const f=filterState(); return D().Settings.filter(s=>settingInScope(s,f)); }
+
+function init(){
+  document.getElementById("subline").textContent =
+    DATA.query+"  ·  generated "+DATA.generated+"  ·  tenant "+DATA.tenant+"  ·  v"+DATA.version;
+  document.getElementById("footer").textContent =
+    "Intune Lens v"+DATA.version+" — "+DATA.query+" — "+DATA.generated;
+
+  const sel = document.getElementById("devSel");
+  DATA.devices.forEach((d,i)=>{
+    const o=document.createElement("option");
+    o.value=i; o.textContent=d.Device.DeviceName+(d.Device.SerialNumber?" ("+d.Device.SerialNumber+")":"");
+    sel.appendChild(o);
+  });
+  sel.onchange=()=>{cur=parseInt(sel.value); rebuildIndex(); buildFilters(); closeInspector(); renderAll();};
+  ["q","famSel","catSel","polSel","confOnly","hideDup"].forEach(id=>{
+    const el=document.getElementById(id);
+    el.addEventListener(el.tagName==="INPUT"&&el.type==="text"?"input":"change",renderAll);
+  });
+  document.getElementById("clearBtn").onclick=clearFilters;
+  document.getElementById("csvBtn").onclick=downloadCsv;
+  document.getElementById("themeBtn").onclick=toggleTheme;
+  document.getElementById("inspClose").onclick=closeInspector;
+
+  document.getElementById("ivQ").addEventListener("input",renderInvestigate);
+  document.getElementById("ivClear").onclick=()=>{
+    document.getElementById("ivQ").value=""; ivOn.clear(); ivOff.clear(); ivPol=null; renderInvestigate();
+  };
+  document.getElementById("ivChips").addEventListener("click",e=>{
+    const b=e.target.closest("[data-topic]"); if(b) ivToggle(b.dataset.topic);
+  });
+  document.getElementById("ovChips").innerHTML=CATS.map(c=>
+    '<div class="chipgroup"><div class="chiphead">'+esc(c.name)+'</div>'+
+    TOPICS.filter(t=>t.cat===c.id).map(t=>
+      '<button type="button" class="tchip" data-topic="'+esc(t.id)+'" title="'+esc(t.label+" — "+t.sub)+'">'+
+      '<span class="ico" aria-hidden="true">'+t.icon+'</span><span class="lbl">'+esc(t.label)+'</span></button>').join("")+
+    '</div>').join("");
+  document.getElementById("ovChips").addEventListener("click",e=>{
+    const b=e.target.closest("[data-topic]"); if(b) ivEngage(b.dataset.topic);
+  });
+  document.getElementById("ivSuspects").addEventListener("click",e=>{
+    const insp=e.target.closest("[data-insp]");
+    if(insp){ openPolicyInspector(insp.dataset.insp); return; }
+    const open=e.target.closest("[data-open]");
+    if(open){ filterByPolicy(open.dataset.open); return; }
+    const card=e.target.closest("[data-pid]");
+    if(card){ ivPol=(ivPol===card.dataset.pid)?null:card.dataset.pid; renderInvestigate(); }
+  });
+  document.querySelector("#tblSettings tbody").addEventListener("click",e=>{
+    const tr=e.target.closest("tr[data-idx]");
+    if(tr&&lastSettingsRows[+tr.dataset.idx]) openSettingInspector(lastSettingsRows[+tr.dataset.idx]);
+  });
+  document.querySelector("#tblPolicies tbody").addEventListener("click",e=>{
+    const tr=e.target.closest("tr[data-pid]");
+    if(tr) openPolicyInspector(tr.dataset.pid);
+  });
+  document.querySelector("#tblIv tbody").addEventListener("click",e=>{
+    const tr=e.target.closest("tr[data-ividx]");
+    if(tr&&ivRows[+tr.dataset.ividx]) openSettingInspector(ivRows[+tr.dataset.ividx].s);
+  });
+  document.getElementById("ivShadowCard").addEventListener("click",e=>{
+    const tr=e.target.closest("tr[data-shidx]");
+    if(tr&&ivShRows[+tr.dataset.shidx]&&ivShRows[+tr.dataset.shidx].s) openSettingInspector(ivShRows[+tr.dataset.shidx].s);
+  });
+  const savedTheme=localStorage.getItem("rsopTheme");
+  if(savedTheme) document.documentElement.dataset.theme=savedTheme;
+
+  document.querySelectorAll(".tab").forEach(t=>{ t.onclick=()=>showTab(t.dataset.tab); });
+  if(DATA.devices.length>1) document.getElementById("matrixTab").style.display="";
+
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"){ closeInspector(); return; }
+    if(e.key==="/"&&document.activeElement.tagName!=="INPUT"){e.preventDefault();document.getElementById("q").focus();}
+  });
+  window.addEventListener("scroll",()=>{
+    document.getElementById("toTop").style.display = window.scrollY>500?"block":"none";
+  });
+  document.getElementById("toTop").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
+
+  document.querySelectorAll("#tblSettings th[data-k]").forEach(th=>{
+    th.onclick=()=>{ sortS = {k:th.dataset.k, d: sortS.k===th.dataset.k? -sortS.d : 1}; renderSettings(); };
+  });
+  document.querySelectorAll("#tblPolicies th[data-k]").forEach(th=>{
+    th.onclick=()=>{ sortP = {k:th.dataset.k, d: sortP.k===th.dataset.k? -sortP.d : 1}; renderPolicies(); };
+  });
+
+  rebuildIndex(); buildFilters(); renderAll(); renderMatrix();
+}
+
+function showTab(name){
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));
+  ["overview","investigate","settings","policies","conflicts","matrix"].forEach(p=>{
+    document.getElementById("pane-"+p).style.display = (p===name)?"":"none";
+  });
+}
+
+function clearFilters(){
+  ["famSel","catSel","polSel"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("q").value="";
+  document.getElementById("confOnly").checked=false;
+  document.getElementById("hideDup").checked=false;
+  renderAll();
+}
+
+function buildFilters(){
+  const d=D();
+  const fill=(id,vals,label)=>{
+    const sel=document.getElementById(id); const old=sel.value;
+    sel.innerHTML='<option value="">'+label+'</option>';
+    vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o);});
+    if(vals.includes(old)) sel.value=old;
+  };
+  fill("famSel",[...new Set([].concat(d.Settings.map(s=>s.FamilyLabel),d.Policies.map(p=>p.FamilyLabel)))].sort(),"All policy types");
+  fill("catSel",[...new Set(d.Settings.map(s=>s.Category).filter(x=>x))].sort(),"All categories");
+  // policy dropdown is id-backed so two entries of the same app (one per assignment
+  // intent) stay distinct - the intent shows as a suffix
+  const sel=document.getElementById("polSel"); const old=sel.value;
+  sel.innerHTML='<option value="">All policies</option>';
+  [...d.Policies].sort((a,b)=>String(a.Name).localeCompare(String(b.Name))||String(a.Intent||"").localeCompare(String(b.Intent||""))).forEach(p=>{
+    const o=document.createElement("option");
+    o.value=p.PolicyId; o.textContent=p.Name+(p.Intent?" · "+p.Intent:"");
+    sel.appendChild(o);
+  });
+  if([...sel.options].some(o=>o.value===old)) sel.value=old;
+}
+
+function renderAll(){
+  const d=D();
+  const f=filterState();
+  const act=filtersActive(f);
+  const fs=d.Settings.filter(s=>settingInScope(s,f));
+  const fp=d.Policies.filter(p=>policyInScope(p,f));
+  const fc=d.Conflicts.filter(c=>conflictInScope(c,f));
+  document.getElementById("nSettings").textContent=act?fs.length+"/"+d.Settings.length:d.Settings.length;
+  document.getElementById("nPolicies").textContent=act?fp.length+"/"+d.Policies.length:d.Policies.length;
+  document.getElementById("nConflicts").textContent=act?fc.length+"/"+d.Conflicts.length:d.Conflicts.length;
+  const note=document.getElementById("filterNote");
+  if(act){
+    note.style.display="";
+    note.innerHTML="Filters apply to the whole report: <b>"+fs.length+"</b> of "+d.Settings.length+" settings · <b>"+
+      fp.length+"</b> of "+d.Policies.length+" policies · <b>"+fc.length+"</b> of "+d.Conflicts.length+
+      " conflicts in scope. <span class='linkish' onclick='clearFilters()'>Clear</span>";
+  } else note.style.display="none";
+  renderOverview(); renderInvestigate(); renderSettings(); renderPolicies(); renderConflicts();
+}
+
+function renderOverview(){
+  const d=D();
+  const applied=d.Policies.filter(p=>p.Status==="Applies"||p.Status==="Assigned").length;
+  const excl=d.Policies.filter(p=>p.Status==="Excluded"||p.Status==="FilteredOut"||p.Status==="NotAssigned").length;
+  const unk=d.Policies.filter(p=>p.Status==="Unknown"||p.Status==="ReportedOnly").length;
+  document.getElementById("statCards").innerHTML=
+    '<div class="stat"><b>'+applied+'</b><span>policies apply</span></div>'+
+    '<div class="stat"><b>'+d.Settings.length+'</b><span>settings</span></div>'+
+    '<div class="stat'+(d.Conflicts.length?" warn":"")+'"><b>'+d.Conflicts.length+'</b><span>conflicts</span></div>'+
+    '<div class="stat"><b>'+excl+'</b><span>excluded / filtered / unassigned</span></div>'+
+    '<div class="stat'+(unk?" warn":"")+'"><b>'+unk+'</b><span>unknown / reported-only</span></div>';
+
+  const g=d.Device;
+  const kv=[["Name",g.DeviceName],["Serial",g.SerialNumber],["OS",g.OS],["Model",g.Model],
+            ["Primary user",g.PrimaryUser],["Last sync",g.LastSync],
+            ["Device groups",(g.DeviceGroups||[]).join(", ")],["User groups",(g.UserGroups||[]).join(", ")]];
+  document.getElementById("devInfo").innerHTML =
+    kv.filter(x=>x[1]).map(x=>'<div class="k">'+esc(x[0])+'</div><div>'+esc(x[1])+'</div>').join("");
+
+  const fams={};
+  d.Policies.forEach(p=>{ if(p.Status==="Applies"||p.Status==="Assigned"){ fams[p.FamilyLabel]=fams[p.FamilyLabel]||{p:0,s:0}; fams[p.FamilyLabel].p++; fams[p.FamilyLabel].s+=p.SettingCount; }});
+  document.querySelector("#famTable tbody").innerHTML =
+    Object.keys(fams).sort().map(f=>'<tr><td>'+esc(f)+'</td><td>'+fams[f].p+'</td><td>'+fams[f].s+'</td></tr>').join("")||'<tr><td colspan="3" class="small">nothing applies</td></tr>';
+
+  const oc=document.getElementById("ovConflicts");
+  if(d.Conflicts.length){
+    oc.style.display="";
+    oc.innerHTML='<h3 style="margin:0 0 8px;font-size:14px;color:var(--red)">⚠ '+d.Conflicts.length+' conflicting setting'+(d.Conflicts.length>1?"s":"")+'</h3>'+
+      d.Conflicts.slice(0,5).map(c=>'<div class="warnrow">'+esc(c.Setting)+' — <span class="small">'+
+        c.Sources.map(s=>esc(s.Policy)+" = "+esc(String(s.Value).slice(0,60))).join("  |  ")+'</span></div>').join("")+
+      (d.Conflicts.length>5?'<div class="small linkish" style="margin-top:6px" onclick="showTab(\'conflicts\')">see all '+d.Conflicts.length+' →</div>':"");
+  } else { oc.style.display="none"; }
+
+  const ow=document.getElementById("ovWarnings");
+  const warns=(DATA.warnings||[]).filter(w=>w.Level!=="info");
+  const infos=(DATA.warnings||[]).filter(w=>w.Level==="info");
+  if(warns.length||infos.length){
+    ow.style.display="";
+    ow.innerHTML='<h3 style="margin:0 0 8px;font-size:14px">Run diagnostics</h3>'+
+      warns.map(w=>'<div class="warnrow"><span class="lvl-'+esc(w.Level)+'">'+esc(w.Level.toUpperCase())+'</span> '+esc(w.Time)+' — '+esc(w.Message)+'</div>').join("")+
+      (infos.length?'<details style="margin-top:6px"><summary class="small" style="cursor:pointer">'+infos.length+' info entries</summary>'+
+        infos.map(w=>'<div class="warnrow"><span class="lvl-info">info</span> '+esc(w.Time)+' — '+esc(w.Message)+'</div>').join("")+'</details>':"");
+  } else { ow.style.display="none"; }
+}
+
+function cmp(a,b,k,d){
+  let x=a[k], y=b[k];
+  if(typeof x==="number"&&typeof y==="number") return (x-y)*d;
+  return String(x==null?"":x).localeCompare(String(y==null?"":y),undefined,{sensitivity:"base"})*d;
+}
+function arrows(tblId, st){
+  document.querySelectorAll("#"+tblId+" th[data-k] .arr").forEach(sp=>sp.textContent="");
+  const th=document.querySelector("#"+tblId+" th[data-k='"+st.k+"'] .arr");
+  if(th) th.textContent = st.d>0?"▲":"▼";
+}
+
+function renderSettings(){
+  const q=parseQuery(document.getElementById("q").value).flat();
+  let rows=filteredSettings();
+  if(sortS.k) rows=[...rows].sort((a,b)=>cmp(a,b,sortS.k,sortS.d));
+  arrows("tblSettings",sortS);
+  lastSettingsRows=rows;
+  const tb=document.querySelector("#tblSettings tbody");
+  const frag=document.createDocumentFragment();
+  rows.forEach((s,i)=>{
+    const tr=document.createElement("tr");
+    tr.dataset.idx=i; tr.className="rowlink";
+    let badge="";
+    if(s.Conflict==="CONFLICT") badge='<span class="badge b-conflict">CONFLICT</span>';
+    else if(s.Conflict==="Duplicate") badge='<span class="badge b-dup">dup</span>';
+    const isJson=/^[\[{]/.test(s.Value||"");
+    const long=(s.Value||"").length>110;
+    const vinner=(isJson?'<span class="mono">':'')+hl(s.Value,q)+(isJson?'</span>':'');
+    const v=(long||isJson)?'<div class="vwrap expandable" onclick="event.stopPropagation();this.classList.toggle(\'open\')">'+vinner+'</div>':vinner;
+    tr.innerHTML="<td class='small'>"+hl(s.Category||"",q)+"</td><td>"+hl(s.Setting,q)+"</td><td>"+v+
+      "</td><td title='"+esc(s.Via||"")+"'>"+hl(s.PolicyName,q)+"</td><td class='small'>"+esc(s.FamilyLabel)+"</td><td>"+badge+"</td>";
+    frag.appendChild(tr);
+  });
+  tb.innerHTML=""; tb.appendChild(frag);
+  document.getElementById("rowCount").textContent=rows.length+" of "+D().Settings.length+" settings shown · click a row for policy & assignment context";
+}
+
+function renderPolicies(){
+  const d=D();
+  const f=filterState();
+  const q=f.groups.flat();
+  let rows=d.Policies.filter(p=>policyInScope(p,f));
+  if(sortP.k) rows=[...rows].sort((a,b)=>cmp(a,b,sortP.k,sortP.d));
+  arrows("tblPolicies",sortP);
+  const tb=document.querySelector("#tblPolicies tbody");
+  tb.innerHTML=rows.map(p=>{
+    const cls="b-"+p.Status.toLowerCase();
+    return "<tr class='rowlink' data-pid='"+esc(p.PolicyId)+"'><td><span class='badge "+cls+"'>"+esc(p.Status)+"</span></td>"+
+      "<td><span class='linkish' title='"+esc(p.Desc||"")+"'>"+hl(p.Name,q)+"</span>"+(p.Intent?' <span class="mt">'+esc(p.Intent)+'</span>':"")+"</td>"+
+      "<td class='small'>"+esc(p.FamilyLabel)+"</td><td class='small'>"+esc(p.Detail||"")+"</td>"+
+      "<td>"+esc(p.SettingCount)+"</td><td class='small'>"+esc(p.Modified||"")+"</td>"+
+      "<td class='small'>"+esc(p.Reported||"")+"</td><td class='small'>"+hl(p.Via,q)+"</td></tr>";
+  }).join("");
+  document.getElementById("polCount").textContent=rows.length+" of "+d.Policies.length+" policies shown · click a row for why it applies, assignments & filters";
+}
+
+function filterByPolicy(pid){
+  const sel=document.getElementById("polSel");
+  sel.value=pid;
+  if(sel.value!==pid) sel.value="";
+  closeInspector();
+  showTab("settings"); renderAll();
+}
+
+function renderConflicts(){
+  const d=D();
+  const f=filterState();
+  const q=f.groups.flat();
+  const cl=document.getElementById("confList");
+  if(!d.Conflicts.length){
+    cl.innerHTML='<div class="card small">No conflicting values among applicable policies.<br><br>Note: conflicts are matched per setting key. Settings Catalog, modern Endpoint Security and modern Baselines share keys; the same OS setting delivered via ADMX or a classic template uses a different key and cannot be auto-correlated.</div>';
+    return;
+  }
+  const rows=d.Conflicts.filter(c=>conflictInScope(c,f));
+  const head=(rows.length!==d.Conflicts.length)?'<div class="card small">'+rows.length+' of '+d.Conflicts.length+' conflicts match the current filters.</div>':"";
+  cl.innerHTML=head+(rows.length?rows.map(c=>
+    '<div class="conf-card"><h3>'+hl(c.Setting,q)+'</h3>'+
+    c.Sources.map(s=>'<div class="conf-src"><span class="linkish" onclick=\'openPolicyInspector('+JSON.stringify(String(s.PolicyId||""))+')\'>'+hl(s.Policy,q)+'</span><b>'+hl(String(s.Value),q)+'</b></div>').join("")+
+    '</div>').join(""):'<div class="card small">No conflicts match the current filters.</div>');
+}
+
+/* ---------- detail inspector ---------------------------------------------------------------
+   Click a policy (Policies tab, conflict source, Investigate suspect) or a setting row
+   (Settings / Investigate tables) to open it. Reuses the result model fields only:
+   Status, Via, Reported, Intent, Assignment, AssignmentDetail, Conflicts, Shadow. */
+function openInspector(head,body){
+  document.getElementById("inspHead").innerHTML=head;
+  document.getElementById("inspBody").innerHTML=body;
+  document.getElementById("insp").classList.add("open");
+  document.getElementById("inspBody").scrollTop=0;
+}
+function closeInspector(){ document.getElementById("insp").classList.remove("open"); }
+const stBadge=p=>'<span class="badge b-'+String(p.Status).toLowerCase()+'">'+esc(p.Status)+'</span>';
+function viaList(via){
+  const parts=String(via==null?"":via).split(/\s+\|\s+/).map(x=>x.trim()).filter(Boolean);
+  return parts.length?'<ul>'+parts.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':'<div class="small">—</div>';
+}
+function asgTable(p){
+  const det=p.AssignmentDetail||[];
+  if(!det.length){
+    if(p.Status==="ReportedOnly") return '<div class="small">Reported by the device at check-in; targeting was not predicted — verify assignments in the portal.</div>';
+    return '<div class="small">'+esc(p.Assignment||"No assignments recorded")+'</div>';
+  }
+  return '<div class="tblwrap"><table><thead><tr><th>Mode</th><th>Target</th><th>Assignment filter</th></tr></thead><tbody>'+
+    det.map(a=>'<tr><td>'+(a.Mode==="Exclude"?'<span class="badge b-excluded">Exclude</span>':'<span class="badge b-applies">Include</span>')+
+      '</td><td>'+esc(a.Target)+'</td><td class="small">'+(a.Filter?esc((a.FilterMode||"")+" · "+a.Filter):"—")+'</td></tr>').join("")+
+    '</tbody></table></div>';
+}
+function openPolicyInspector(pid){
+  const p=POLBYID[pid]; if(!p) return;
+  const head='<div>'+stBadge(p)+' <span class="mt">'+esc(p.FamilyLabel)+'</span>'+
+    (p.Intent?' <span class="mt">intent: '+esc(p.Intent)+'</span>':"")+'<h2>'+esc(p.Name)+'</h2></div>';
+  let b="";
+  if(p.Desc) b+='<div class="small" style="margin-top:8px">'+esc(p.Desc)+'</div>';
+  const kv=[["Template / baseline",p.Detail],["Assignment intent",p.Intent],["Last modified",p.Modified],
+            ["Settings delivered",p.SettingCount],["Device reported",p.Reported],["Policy id",p.PolicyId]];
+  b+='<h4>Details</h4><div class="kv">'+kv.filter(x=>x[1]!==""&&x[1]!=null).map(x=>'<div class="k">'+esc(x[0])+'</div><div>'+esc(x[1])+'</div>').join("")+'</div>';
+  b+='<h4>Why it '+(p.Status==="Applies"||p.Status==="Assigned"?"applies":"has status “"+esc(p.Status)+"”")+'</h4>'+viaList(p.Via);
+  b+='<h4>Assignments (include / exclude / filters)</h4>'+asgTable(p);
+  const confs=D().Conflicts.filter(c=>c.Sources.some(s=>String(s.PolicyId||"")===pid));
+  if(confs.length){
+    b+='<h4>Conflicts</h4><div class="small">Involved in <b>'+confs.length+'</b> conflicting setting'+(confs.length>1?"s":"")+
+       ' — <span class="linkish" onclick=\'inspGoConflicts('+JSON.stringify(String(pid))+')\'>view them</span></div>';
+  }
+  b+='<h4>Actions</h4>';
+  if(D().Settings.some(s=>s.PolicyId===pid)){
+    b+='<button class="btn" onclick=\'filterByPolicy('+JSON.stringify(String(pid))+')\'>Show only this policy&#39;s settings</button>';
+  } else if(SH().some(s=>s.PolicyId===pid)){
+    b+='<div class="small">Not applying here — its settings are listed in Investigate under “targeted but not applying”.</div>';
+  } else {
+    b+='<div class="small">No setting rows for this policy in this report.</div>';
+  }
+  openInspector(head,b);
+}
+function inspGoConflicts(pid){
+  const sel=document.getElementById("polSel");
+  sel.value=pid; if(sel.value!==pid) sel.value="";
+  closeInspector(); showTab("conflicts"); renderAll();
+}
+function openSettingInspector(s){
+  if(!s) return;
+  const p=POLBYID[s.PolicyId];
+  const isJson=/^[\[{]/.test(s.Value||"");
+  let badges="";
+  if(s.Conflict==="CONFLICT") badges='<span class="badge b-conflict">CONFLICT</span> ';
+  else if(s.Conflict==="Duplicate") badges='<span class="badge b-dup">duplicate</span> ';
+  else if(s.Status) badges='<span class="badge b-'+String(s.Status).toLowerCase()+'">'+esc(s.Status)+'</span> ';
+  const head='<div>'+badges+(s.Category?'<span class="mt">'+esc(s.Category)+'</span>':"")+'<h2>'+esc(s.Setting)+'</h2></div>';
+  let b='<h4>Value</h4><div class="ival'+(isJson?' mono':'')+'">'+esc(s.Value)+'</div>';
+  b+='<h4>Delivered by</h4><div><span class="linkish" onclick=\'openPolicyInspector('+JSON.stringify(String(s.PolicyId||""))+')\'>'+esc(s.PolicyName)+'</span>'+
+     (p?' '+stBadge(p):"")+'<div class="small" style="margin-top:2px">'+esc(s.FamilyLabel)+(p&&p.Intent?' · intent: '+esc(p.Intent):"")+
+     (p&&p.Reported?' · device reported: '+esc(p.Reported):"")+'</div></div>';
+  b+='<h4>Why this setting is present</h4>'+viaList(s.Via||(p&&p.Via)||"");
+  if(p) b+='<h4>Assignments of the policy</h4>'+asgTable(p);
+  const c=s.Key?CONFBYKEY[s.Key]:null;
+  if(c&&c.Sources&&c.Sources.length>1){
+    b+='<h4>All values set for this setting</h4>'+c.Sources.map(x=>
+      '<div class="conf-src"><span class="linkish" onclick=\'openPolicyInspector('+JSON.stringify(String(x.PolicyId||""))+')\'>'+esc(x.Policy)+'</span><b>'+esc(x.Value)+'</b></div>').join("");
+  }
+  if(s.Key) b+='<h4>Setting key</h4><div class="small mono">'+esc(s.Key)+'</div>';
+  openInspector(head,b);
+}
+
+/* ---------- Investigate: problem -> probable causes ------------------------------------
+   Topics expand a plain-language problem into the many names the same concept has across
+   CSP / ADMX / Settings Catalog / legacy templates, then rank the policies that deliver
+   matching settings to THIS device. keys = whole-text triggers; terms = search synonyms. */
+const CATS=[
+ {id:"devices",name:"Devices & peripherals"},
+ {id:"apps",name:"Apps & browser"},
+ {id:"network",name:"Network & files"},
+ {id:"privacy",name:"Sign-in & privacy"},
+ {id:"security",name:"Security & updates"}
+];
+const TOPICS=[
+ {id:"usb",cat:"devices",icon:"🔌",label:"USB & storage",sub:"USB sticks, SD cards, removable drives",
+  keys:["usb","removable","thumb drive","flash drive","sd card","pendrive","memory stick","external drive","usbstor","device control"],
+  terms:["usb","removable","portable device","wpd","storage card","sd card","memory card","external drive","external storage","device installation","deviceinstall","storage access","deny write","denywrite","deny read","denyread","device control","allowstoragecard","removable disk","removable drive","removable storage","bitlocker removable","rdvdeny","rdvconfigure","mass storage","usbstor","device class","hardware id","peripheral"],
+  hint:"Common blockers: <b>Device Control</b> (Defender) policies, <b>Device Installation restrictions</b> by class GUID / hardware ID (USBSTOR, WPD), Device Restrictions → Removable storage, and BitLocker <b>Deny write access to removable drives</b>. If nothing here matches: Defender for Endpoint Device Control managed from the MDE portal and third-party DLP agents are invisible to Intune reports."},
+ {id:"camera",cat:"devices",icon:"📷",label:"Camera & mic",sub:"Webcam and microphone access",
+  keys:["camera","webcam","microphone"],
+  terms:["camera","webcam","microphone","letappsaccesscamera","letappsaccessmicrophone","privacy"],
+  hint:"Check Device Restrictions → Camera, and the per-app privacy settings (LetAppsAccessCamera / LetAppsAccessMicrophone force-deny lists)."},
+ {id:"bluetooth",cat:"devices",icon:"🎧",label:"Bluetooth",sub:"Pairing, headsets, discoverability",
+  keys:["bluetooth","pairing"],
+  terms:["bluetooth","allowbluetooth","pairing","discoverable","advertising","bluetooth services"],
+  hint:"A strict 'Bluetooth allowed services' list silently breaks most accessories; Device Installation restrictions can also catch BT adapters."},
+ {id:"printing",cat:"devices",icon:"🖨️",label:"Printing",sub:"Printers, Point and Print, spooler",
+  keys:["printer","printing","print job","spooler"],
+  terms:["printer","printing","point and print","universal print","spooler","print job"],
+  hint:"Point and Print restrictions (post-PrintNightmare hardening) commonly block driver installs for non-admins."},
+ {id:"appremoval",cat:"apps",icon:"🗑️",label:"App removal",sub:"An app got uninstalled or blocked",
+  keys:["uninstall","uninstalled","disappear","removed","applocker","wdac","appx","missing app"],
+  terms:["uninstall","remove-appx","removepackage","remove package","appx","msix","deprovision","cleanup","debloat","bloatware","blocked app","prohibited","applocker","app control","wdac","smart app control","excluded microsoft 365","assignment intent","removal"],
+  hint:"Most likely causes, in order:<ol><li>the app is assigned with intent = <b>Uninstall</b> to a group containing this device or user — look for <b>App removal</b> suspects whose assignment intent is <b>Uninstall</b> (⚑-flagged)</li><li>a platform <b>script</b> that removes packages — script bodies are searchable here</li><li><b>Microsoft 365 Apps suite</b> 'excluded apps' (deselected apps are actively uninstalled)</li><li>AppLocker / WDAC blocking launch, which users report as the app 'gone'</li></ol>"},
+ {id:"store",cat:"apps",icon:"🛒",label:"Store & winget",sub:"Microsoft Store, winget, App Installer",
+  keys:["store","winget","app installer"],
+  terms:["microsoft store","msstore","winget","app installer","appinstaller","private store","requireprivatestoreonly","apps from the store"],
+  hint:"'Turn off the Store application' also breaks winget's msstore source. Store auto-update policies interact with 'block non-admin installs'."},
+ {id:"copilot",cat:"apps",icon:"🤖",label:"Copilot & AI",sub:"Copilot, Recall, Click-to-do",
+  keys:["copilot","recall","windows ai"],
+  terms:["copilot","windows ai","recall","click to do","turnoffwindowscopilot","ai features","generative","m365 copilot","bing chat","chat icon"],
+  hint:"'Turn off Windows Copilot' (ADMX/CSP) only <i>hides</i> the assistant. The Microsoft 365 Copilot <b>app</b> vanishing is usually an <b>Uninstall app assignment</b> or a platform script — the '<b>App removal</b>' topic is auto-engaged for that. Some Copilot controls live in the M365 admin center / Cloud Policy, outside Intune."},
+ {id:"browser",cat:"apps",icon:"🌐",label:"Edge & Chrome",sub:"Browser extensions and policies",
+  keys:["edge","chrome","browser","extension","homepage","popup"],
+  terms:["edge","chrome","browser","extension","homepage","home page","startup page","new tab","favorites","popup","password manager","smartscreen","inprivate","incognito","developer tools"],
+  hint:"Edge policies arrive via Settings Catalog <i>and</i> ADMX — same setting, different keys, so duplicates are not auto-correlated as conflicts. Edge 'Cloud Policy' from the M365 admin center is outside Intune."},
+ {id:"network",cat:"network",icon:"📶",label:"Wi-Fi & VPN",sub:"Wi-Fi, VPN, proxy, DNS, hotspot",
+  keys:["wifi","wi-fi","wlan","vpn","proxy","ethernet","internet","dns","hotspot"],
+  terms:["wifi","wi-fi","wlan","vpn","proxy","ethernet","dns","network isolation","hotspot","tethering","captive","airplane","always on","firewall"],
+  hint:"Wi-Fi/VPN profiles, Endpoint Security Firewall rules and proxy settings can fight each other — check Conflicts too."},
+ {id:"onedrive",cat:"network",icon:"☁️",label:"OneDrive",sub:"Sync and Known Folder Move",
+  keys:["onedrive","known folder","kfm"],
+  terms:["onedrive","known folder","kfm","files on-demand","files on demand","silentaccountconfig","sync"],
+  hint:"KFM 'silently move' and 'prevent redirect' must be consistent across policies; tenant-level SharePoint sync restrictions live outside Intune."},
+ {id:"signin",cat:"privacy",icon:"🔑",label:"Sign-in & Hello",sub:"Password, PIN, Hello, lock screen",
+  keys:["password","hello","lock screen","logon","login","sign-in","signin","biometric","screensaver","screen saver","fingerprint"],
+  terms:["password","pin","hello","biometric","lock screen","screen saver","screensaver","timeout","idle","inactivity","logon","sign-in","signin","credential","security key","fido","web sign-in","kiosk","autologon"],
+  hint:"Hello for Business can come from the tenant-wide enrollment policy AND per-group policies at once. Inactivity/lock timeouts also hide in Security Baselines."},
+ {id:"clipboard",cat:"privacy",icon:"📋",label:"Screen & clipboard",sub:"Screenshots, clipboard, screen capture",
+  keys:["screenshot","clipboard","snipping","screen capture","print screen"],
+  terms:["screenshot","screen capture","clipboard","snipping","print screen","printscreen","allowscreencapture"],
+  hint:"Mostly Device Restrictions → Screen capture; for managed apps also App Protection (MAM) policies."},
+ {id:"telemetry",cat:"privacy",icon:"📊",label:"Telemetry",sub:"Diagnostic data and advertising ID",
+  keys:["telemetry","diagnostic","advertising id","feedback"],
+  terms:["telemetry","diagnostic data","diagnosticdata","feedback","tailored","advertising id","experimentation","commercial data"],
+  hint:"Diagnostic data at 'Security (0)' breaks Autopatch / Update Compliance reporting."},
+ {id:"defender",cat:"security",icon:"🛡️",label:"Defender & firewall",sub:"Antivirus, firewall, ASR rules",
+  keys:["defender","antivirus","asr","smartscreen","firewall","virus","quarantine","tamper"],
+  terms:["defender","antivirus","real-time protection","realtimeprotection","attack surface","asr rule","exploit","tamper","smartscreen","cloud protection","sample submission","exclusion","quarantine","firewall","threat","pua","potentially unwanted"],
+  hint:"ASR rules in Block mode are a classic hidden blocker for scripts, macros and USB executables. Some AV settings merge 'most secure wins' across policies without showing as conflicts."},
+ {id:"encryption",cat:"security",icon:"🔒",label:"BitLocker",sub:"Disk encryption, TPM, recovery key",
+  keys:["bitlocker","encrypt","recovery key","tpm"],
+  terms:["bitlocker","encryption","encrypt","recovery key","recovery password","tpm","secure boot","personal data encryption","xts"],
+  hint:"Endpoint Security Disk Encryption and Settings Catalog BitLocker share keys; legacy endpoint-protection templates do not — the same OS setting can appear twice without a flagged conflict."},
+ {id:"updates",cat:"security",icon:"🔄",label:"Windows Update",sub:"Update rings, deferrals, reboots",
+  keys:["update","upgrade","patch","reboot","restart"],
+  terms:["windows update","feature update","quality update","driver update","defer","pause","deadline","active hours","restart","servicing","upgrade","target release","safeguard","delivery optimization"],
+  hint:"Update ring + feature-update profile + expedite policy overlap; the strictest deadline wins. A pinned TargetReleaseVersion blocks upgrades silently."}
+];
+const IV_STOP=new Set(["the","a","an","is","are","was","were","it","its","itself","my","our","your","on","in","to","of","by","and","or","not","no","cant","cannot","wont","dont","doesnt","didnt","why","what","who","when","how","keeps","keep","gets","get","got","getting","being","been","from","self","device","devices","user","users","computer","laptop","pc","machine","policy","policies","setting","settings","intune","windows","working","work","works","broken","issue","problem","error","help","cause","causing","some","all","every","still","again","suddenly","randomly","by"]);
+let ivOn=new Set(), ivOff=new Set(), ivPol=null;
+
+function ivAutoTopics(){
+  const text=document.getElementById("ivQ").value.toLowerCase();
+  const out=new Set();
+  if(text.trim().length>=3) TOPICS.forEach(t=>{ if(t.keys.some(k=>text.includes(k))) out.add(t.id); });
+  return out;
+}
+function ivActiveIds(){
+  const auto=ivAutoTopics();
+  const act=new Set();
+  TOPICS.forEach(t=>{
+    if(ivOn.has(t.id)||(auto.has(t.id)&&!ivOff.has(t.id))) act.add(t.id);
+  });
+  return {act,auto};
+}
+function ivTerms(actIds){
+  const terms=new Set();
+  TOPICS.forEach(t=>{ if(actIds.has(t.id)) t.terms.forEach(x=>terms.add(x)); });
+  parseQuery(document.getElementById("ivQ").value).flat().forEach(tok=>{
+    if(tok.length<3||IV_STOP.has(tok)) return;
+    terms.add(tok);
+    // light stemming so 'blocked'/'uninstalls' also hit 'Block'/'Uninstall'
+    let stem=tok.replace(/(ing|ed|es|s)$/,"");
+    if(stem.length>=4) terms.add(stem);
+  });
+  return [...terms].sort((a,b)=>b.length-a.length);
+}
+function ivToggle(id){
+  const {act}=ivActiveIds();
+  if(act.has(id)){ ivOff.add(id); ivOn.delete(id); }
+  else { ivOn.add(id); ivOff.delete(id); }
+  renderInvestigate();
+}
+function ivEngage(id){
+  ivOn.add(id); ivOff.delete(id);
+  showTab("investigate");
+  renderInvestigate();
+  document.getElementById("ivQ").focus();
+}
+function isCulprit(s){
+  const v=String(s.Value==null?"":s.Value).toLowerCase().trim();
+  const n=String(s.Setting||"").toLowerCase();
+  if(n==="assignment intent") return v==="uninstall";
+  const negName=/\b(block|deny|denied|disable|disallow|prevent|restrict|turn ?off|remove|uninstall|hide|prohibit|not allow|never)\b/.test(n);
+  const vAffirm=/^(yes|true|1|enabled?|on|required?|always|force)\b/.test(v)||/^(block(ed)?|den(y|ied))/.test(v);
+  const vNegates=/^(no|false|0|disabled?|off|not configured|none)\b/.test(v);
+  const vBlocky=/\b(block|den(y|ied)|disab|not allowed|prevent|restrict|remove|uninstall|force ?deny)/.test(v);
+  if(negName) return vAffirm||(vBlocky&&!vNegates);
+  return vBlocky||(vNegates&&!/^not configured/.test(v));
+}
+function ivMatchTerms(hay,terms){
+  const out=[];
+  for(const t of terms){ if(hay.includes(t)) out.push(t); }
+  return out;
+}
+// Capitalise each word of a filter-button label, leaving words that already start
+// with an uppercase letter alone so acronyms (USB, AI, VPN, Wi-Fi, OneDrive, BitLocker) stay intact.
+function ivTitleCase(s){
+  return s.replace(/\S+/g,w=>/^[a-z]/.test(w)?w.charAt(0).toUpperCase()+w.slice(1):w);
+}
+function buildIvChips(){
+  const {act,auto}=ivActiveIds();
+  // Chip state is signalled by a fixed-width leading glyph (not colour alone): ✓ engaged,
+  // ↻ auto-detected from the typed text, ✕ auto-detected but dismissed. The slot is always
+  // present so widths never reflow as the admin types.
+  const mk=t=>{
+    let cls,st,why;
+    if(ivOn.has(t.id)){ cls="tchip on"; st="✓"; why="engaged — click to turn off"; }
+    else if(act.has(t.id)){ cls="tchip auto"; st="↻"; why="auto-detected from your text — click to turn off"; }
+    else if(auto.has(t.id)&&ivOff.has(t.id)){ cls="tchip off"; st="✕"; why="auto-detected but turned off — click to turn back on"; }
+    else { cls="tchip"; st=""; why="click to search this topic"; }
+    return '<button type="button" class="'+cls+'" data-topic="'+esc(t.id)+'" aria-pressed="'+(act.has(t.id))+
+      '" title="'+esc(t.label+" — "+t.sub+" ("+why+")")+'">'+
+      '<span class="st" aria-hidden="true">'+st+'</span><span class="ico" aria-hidden="true">'+t.icon+
+      '</span><span class="lbl">'+esc(ivTitleCase(t.label))+'</span></button>';
+  };
+  document.getElementById("ivChips").innerHTML=CATS.map(c=>
+    '<div class="chipgroup"><div class="chiphead">'+esc(c.name)+'</div>'+
+    TOPICS.filter(t=>t.cat===c.id).map(mk).join("")+'</div>').join("");
+}
+function renderInvestigate(){
+  const d=D();
+  buildIvChips();
+  const {act}=ivActiveIds();
+  const terms=ivTerms(act);
+  const nInv=document.getElementById("nInv");
+  const explain=document.getElementById("ivExplain");
+  const scopeEl=document.getElementById("ivScope");
+  const hints=document.getElementById("ivHints");
+  const susBox=document.getElementById("ivSuspects");
+  const tblCard=document.getElementById("ivTableCard");
+  const shCard=document.getElementById("ivShadowCard");
+
+  // Investigate honours the shared filter scope (search, type, category, policy) but not
+  // the conflicts-only / hide-duplicates display toggles - those would hide culprits.
+  const gf=filterState();
+  const ivScope={groups:gf.groups,fam:gf.fam,cat:gf.cat,pol:gf.pol,confOnly:false,hideDup:false};
+  const scoped=!!(ivScope.groups.length||ivScope.fam||ivScope.cat||ivScope.pol);
+  const baseSettings=scoped?d.Settings.filter(s=>settingInScope(s,ivScope)):d.Settings;
+  const baseShadow=scoped?SH().filter(s=>shadowInScope(s,ivScope)):SH();
+  const basePolicies=scoped?d.Policies.filter(p=>policyInScope(p,ivScope)):d.Policies;
+  // scope note (global filter bar) gets its own quiet line rather than crowding the explainer
+  scopeEl.style.display=scoped?"":"none";
+  scopeEl.innerHTML=scoped?'Scoped by the global filter bar to '+baseSettings.length+' setting'+(baseSettings.length===1?"":"s")+' · <span class="linkish" onclick="clearFilters()">clear filters</span>':"";
+
+  if(!terms.length){
+    explain.innerHTML=
+      '<div class="iv-lead">Describe the problem above, or pick a topic.</div>'+
+      '<div class="small">Topics translate your words into the names Intune actually uses — type <b>USB</b> and it also searches <i>removable storage, WPD, device installation, device control…</i> then ranks the policies responsible on this device.</div>'+
+      '<div class="small" style="margin-top:3px">⚑ marks a value that looks restrictive for its setting.</div>';
+    susBox.innerHTML=""; hints.innerHTML=""; tblCard.style.display="none"; shCard.style.display="none"; nInv.style.display="none";
+    return;
+  }
+
+  // ---- match settings rows (applying + unknown), shadow rows and policy metadata
+  const sus={};
+  const susFor=p=>{ if(!sus[p.PolicyId]) sus[p.PolicyId]={p,rows:[],culprits:0,terms:new Set(),meta:false,shadow:[]}; return sus[p.PolicyId]; };
+
+  // rows match on setting-level fields only; a hit on the policy NAME alone makes the
+  // policy a suspect (meta pass below) without dragging in its unrelated settings
+  baseSettings.forEach(s=>{
+    const hay=(s.Setting+" "+s.Value+" "+s.Category).toLowerCase();
+    const m=ivMatchTerms(hay,terms);
+    if(!m.length) return;
+    const p=POLBYID[s.PolicyId]; if(!p) return;
+    const e=susFor(p);
+    const culprit=isCulprit(s);
+    e.rows.push({s,m,culprit});
+    if(culprit) e.culprits++;
+    m.forEach(x=>e.terms.add(x));
+  });
+  baseShadow.forEach(s=>{
+    const hay=(s.Setting+" "+s.Value+" "+s.Category).toLowerCase();
+    const m=ivMatchTerms(hay,terms);
+    if(!m.length) return;
+    const p=POLBYID[s.PolicyId]; if(!p) return;
+    const e=susFor(p);
+    e.shadow.push({s,m,culprit:isCulprit(s)});
+    m.forEach(x=>e.terms.add(x));
+  });
+  basePolicies.forEach(p=>{
+    const hay=(p.Name+" "+(p.Desc||"")+" "+(p.Detail||"")+" "+p.FamilyLabel+" "+(p.Intent||"")+" "+(p.Via||"")).toLowerCase();
+    const m=ivMatchTerms(hay,terms);
+    if(m.length){ const e=susFor(p); e.meta=true; m.forEach(x=>e.terms.add(x)); }
+  });
+
+  const applying=[],shadowSus=[];
+  Object.values(sus).forEach(e=>{
+    const st=e.p.Status;
+    if(st==="Applies"||st==="Assigned"||st==="Unknown"||st==="ReportedOnly") applying.push(e);
+    else shadowSus.push(e);
+  });
+  const stW=s=>s==="Applies"||s==="Assigned"?3:(s==="Unknown"?2:1);
+  applying.sort((a,b)=>(stW(b.p.Status)-stW(a.p.Status))||(b.culprits-a.culprits)||(b.rows.length-a.rows.length)||((b.meta?1:0)-(a.meta?1:0))||a.p.Name.localeCompare(b.p.Name));
+
+  if(ivPol&&!sus[ivPol]) ivPol=null;
+
+  nInv.textContent=applying.length; nInv.style.display="";
+  explain.innerHTML='<b>'+applying.length+'</b> suspect polic'+(applying.length===1?"y":"ies")+' deliver'+(applying.length===1?"s":"")+' matching settings here'+
+    (shadowSus.length?' · <b>'+shadowSus.length+'</b> more targeted here but <b>not applying</b> (below)':"")+
+    (applying.length?'<div class="small" style="margin-top:2px">Ranked most-likely first · click a suspect to focus its settings.</div>':"");
+
+  // ---- suspect cards: the #1 result earns a "most likely cause" call-out when it carries
+  // restrictive values; the rest fall under an "Other suspects" divider
+  const primary=(applying.length&&applying[0].culprits>0)?applying[0].p.PolicyId:null;
+  susBox.innerHTML=applying.length?applying.map((e,idx)=>{
+    const isPrimary=e.p.PolicyId===primary;
+    const isUnknown=e.p.Status==="Unknown"||e.p.Status==="ReportedOnly";
+    const cls="sus-card"+(e.culprits?" culprit":(isUnknown?" unknown":""))+(isPrimary?" primary":"")+(ivPol===e.p.PolicyId?" sel":"");
+    const badge='<span class="badge b-'+e.p.Status.toLowerCase()+'">'+esc(e.p.Status)+'</span>';
+    const flag=e.culprits?'<span class="flag-pill">⚑ '+e.culprits+' restrictive</span>':"";
+    const eyebrow=isPrimary?'<div class="sus-eyebrow">Most likely cause</div>':"";
+    const meta=[e.rows.length?(e.rows.length+" matching setting"+(e.rows.length>1?"s":"")):"matched by name / description"];
+    if(e.p.Intent) meta.push(esc(e.p.Intent));
+    meta.push(esc(e.p.FamilyLabel));
+    if(e.p.Via) meta.push("via "+esc(e.p.Via));
+    if(e.p.Modified) meta.push("modified "+esc(e.p.Modified));
+    const divider=(idx===1&&primary)?'<div class="sus-divider">Other suspects</div>':"";
+    return divider+'<div class="'+cls+'" data-pid="'+esc(e.p.PolicyId)+'">'+eyebrow+
+      '<div class="sus-top">'+badge+'<span class="sus-name">'+esc(e.p.Name)+'</span>'+flag+'</div>'+
+      '<div class="sus-meta">'+meta.join(" · ")+'</div>'+
+      (e.meta&&e.p.Desc?'<div class="sus-meta">'+hl(e.p.Desc,terms)+'</div>':"")+
+      '<div class="small" style="margin-top:6px"><span class="linkish" data-insp="'+esc(e.p.PolicyId)+'">assignment details</span> · <span class="linkish" data-open="'+esc(e.p.PolicyId)+'">open in Settings tab →</span></div>'+
+      '</div>';
+  }).join(""):
+  '<div class="card small">Nothing targeted here matches. Likely causes outside this report: Defender for Endpoint Device Control (MDE portal), third-party DLP/EPP agents, on-prem GPO (hybrid-joined devices), or M365 admin-center policy.</div>';
+
+  // ---- topic hints move BELOW the ranked answer: collapsed by default, auto-opened only
+  // when nothing applied (so the "what to check elsewhere" guidance is front-and-centre)
+  const actTopics=TOPICS.filter(t=>act.has(t.id));
+  if(actTopics.length){
+    const inner=actTopics.map(t=>'<div class="hintbox"><b>'+t.icon+' '+esc(t.label)+'</b><div class="hbody">'+t.hint+'</div></div>').join("");
+    hints.innerHTML='<details class="hintwrap"'+(applying.length===0?" open":"")+'><summary>Why these suspects? — common blockers for '+actTopics.map(t=>esc(t.label)).join(", ")+'</summary>'+inner+'</details>';
+  } else hints.innerHTML="";
+
+  // ---- matching settings table
+  let rows=[];
+  applying.forEach(e=>{ if(!ivPol||ivPol===e.p.PolicyId) e.rows.forEach(r=>rows.push({...r,p:e.p})); });
+  rows.sort((a,b)=>((b.culprit?1:0)-(a.culprit?1:0))||(b.m.length-a.m.length)||String(a.s.Setting).localeCompare(String(b.s.Setting)));
+  ivRows=rows;
+  tblCard.style.display=rows.length?"":"none";
+  document.querySelector("#tblIv tbody").innerHTML=rows.map((r,i)=>{
+    const s=r.s;
+    const isJson=/^[\[{]/.test(s.Value||"");
+    const long=(s.Value||"").length>110;
+    const vinner=(isJson?'<span class="mono">':'')+hl(s.Value,terms)+(isJson?'</span>':'');
+    const v=(long||isJson)?'<div class="vwrap expandable" onclick="event.stopPropagation();this.classList.toggle(\'open\')">'+vinner+'</div>':vinner;
+    return "<tr class='rowlink' data-ividx='"+i+"'><td>"+(r.culprit?'<span class="flag" title="value looks restrictive for this setting name (heuristic - verify)">⚑</span>':"")+"</td>"+
+      "<td>"+hl(s.Setting,terms)+"</td><td>"+v+"</td>"+
+      "<td title='"+esc(s.Via||"")+"'>"+hl(s.PolicyName,terms)+"</td>"+
+      "<td><span class='badge b-"+r.p.Status.toLowerCase()+"'>"+esc(r.p.Status)+"</span></td>"+
+      "<td class='small'>"+esc(s.FamilyLabel)+(r.p.Intent?" · "+esc(r.p.Intent):"")+"</td>"+
+      "<td class='small'>"+r.m.slice(0,3).map(t=>'<span class="mt">'+esc(t)+'</span>').join("")+"</td></tr>";
+  }).join("");
+  document.getElementById("ivRowCount").textContent=rows.length+" matching setting"+(rows.length===1?"":"s")+(ivPol?" (focused on one policy - click its card again to unfocus)":"")+" · click a row for details";
+
+  // ---- targeted but not applying (rule-outs)
+  const shRows=[];
+  shadowSus.forEach(e=>{
+    e.shadow.forEach(r=>shRows.push({...r,p:e.p}));
+    if(!e.shadow.length&&e.meta) shRows.push({s:null,m:[...e.terms],culprit:false,p:e.p});
+  });
+  ivShRows=shRows;
+  shCard.style.display=shRows.length?"":"none";
+  if(shRows.length){
+    shCard.innerHTML='<details><summary style="cursor:pointer;font-size:13px"><b>'+shadowSus.length+
+      '</b> matching polic'+(shadowSus.length===1?"y is":"ies are")+' targeted here but <b>NOT applying</b> (excluded / filtered out) — ruled out as the cause on this target, but they explain differences elsewhere</summary>'+
+      '<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Policy</th><th>Why not applying</th><th>Setting</th><th>Value</th></tr></thead><tbody>'+
+      shRows.map((r,i)=>"<tr"+(r.s?" class='rowlink' data-shidx='"+i+"'":"")+"><td>"+esc(r.p.Name)+' <span class="badge b-'+r.p.Status.toLowerCase()+'">'+esc(r.p.Status)+"</span></td><td class='small'>"+esc(r.p.Via||"")+"</td><td>"+
+        (r.s?hl(r.s.Setting,terms):'<span class="small">(matched by name/description)</span>')+"</td><td>"+(r.s?hl(String(r.s.Value).slice(0,200),terms):"")+"</td></tr>").join("")+
+      '</tbody></table></div></details>';
+  }
+}
+
+function renderMatrix(){
+  if(DATA.devices.length<2) return;
+  const union=new Map();
+  DATA.devices.forEach((d,di)=>{
+    d.Policies.forEach(p=>{
+      if(!union.has(p.PolicyId)) union.set(p.PolicyId,{name:p.Name,fam:p.FamilyLabel,st:{}});
+      union.get(p.PolicyId).st[di]=p.Status;
+    });
+  });
+  const glyph=s=>{
+    if(s==="Applies"||s==="Assigned")return '<span class="mx-y">✓</span>';
+    if(s==="Excluded"||s==="FilteredOut")return '<span class="mx-n">✕</span>';
+    if(s==="Unknown")return '<span class="mx-q">?</span>';
+    if(s==="ReportedOnly")return '<span class="mx-q">R</span>';
+    return '<span class="mx-o">·</span>';
+  };
+  document.querySelector("#tblMatrix thead").innerHTML=
+    "<tr><th>Policy</th><th>Type</th>"+DATA.devices.map((d,i)=>"<th title='"+esc(d.Device.DeviceName)+"'>"+esc(d.Device.SerialNumber||d.Device.DeviceName)+"</th>").join("")+"</tr>";
+  document.querySelector("#tblMatrix tbody").innerHTML=
+    [...union.values()].sort((a,b)=>a.fam.localeCompare(b.fam)||a.name.localeCompare(b.name)).map(u=>
+      "<tr><td>"+esc(u.name)+"</td><td class='small'>"+esc(u.fam)+"</td>"+
+      DATA.devices.map((d,i)=>"<td style='text-align:center'>"+glyph(u.st[i])+"</td>").join("")+"</tr>").join("");
+}
+
+function toggleTheme(){
+  const cyc={"":"light","light":"dark","dark":""};
+  const nxt=cyc[document.documentElement.dataset.theme||""];
+  if(nxt){document.documentElement.dataset.theme=nxt;localStorage.setItem("rsopTheme",nxt);}
+  else{delete document.documentElement.dataset.theme;localStorage.removeItem("rsopTheme");}
+}
+
+function downloadCsv(){
+  const d=D();
+  const rows=filteredSettings();
+  const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  let csv="DeviceName,SerialNumber,PolicyType,AssignmentIntent,PolicyName,Category,Setting,Value,Conflict,AppliesVia\r\n";
+  rows.forEach(s=>{
+    const p=POLBYID[s.PolicyId];
+    csv+=[q(d.Device.DeviceName),q(d.Device.SerialNumber),q(s.FamilyLabel),q(p&&p.Intent||""),q(s.PolicyName),q(s.Category),q(s.Setting),q(s.Value),q(s.Conflict),q(s.Via)].join(",")+"\r\n";
+  });
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="IntuneLens-"+(d.Device.SerialNumber||d.Device.DeviceName).replace(/[^a-z0-9-]/gi,"_")+".csv";
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>
