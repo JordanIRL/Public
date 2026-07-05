@@ -159,9 +159,10 @@
     ./Get-IntuneResultantSettings.ps1 -All -ScopeFilter "Corp Windows 11"
 
 .NOTES
-    Version 2.3.1 (2026-07-05)
+    Version 2.5.1 (2026-07-05)
     Run with NO parameters for a guided interactive menu.
     Read-only: performs GET/report POST calls only; never modifies tenant data.
+    Encrypted custom OMA-URI values are decrypted into the report - treat the export as sensitive.
     Keep report-template.html next to this script for the full-featured HTML report.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Interactive')]
@@ -218,7 +219,7 @@ param(
 
 Set-StrictMode -Off
 $ErrorActionPreference = 'Stop'
-$script:Version = '2.3.1'
+$script:Version = '2.5.1'
 $script:StartTime = Get-Date
 
 #region ---------- console helpers ----------------------------------------------------------
@@ -543,6 +544,23 @@ function Expand-CatalogInstance {
     if (-not $name) { $name = Get-DefinitionTail $defId }
     $display = if ($Prefix) { "$Prefix > $name" } else { $name }
 
+    # Microsoft reference for this setting, straight from the setting definition Graph already
+    # expanded: a concise description (prefer 'description', fall back to 'helpText') and the
+    # first infoUrls entry (usually a learn.microsoft.com deep link). Surfaced in the report's
+    # detail inspector as "Microsoft Learn".
+    $rowInfo = ''
+    $rowInfoUrl = ''
+    if ($def) {
+        $desc = [string](Get-Prop $def 'description')
+        if (-not $desc) { $desc = [string](Get-Prop $def 'helpText') }
+        if ($desc) {
+            $desc = ($desc -replace '\s+', ' ').Trim()
+            if ($desc.Length -gt 400) { $desc = $desc.Substring(0, 397) + '...' }
+            $rowInfo = $desc
+        }
+        foreach ($u in (Get-PropList $def 'infoUrls')) { if ($u) { $rowInfoUrl = [string]$u; break } }
+    }
+
     switch -Wildcard ($odata) {
 
         '*choiceSettingInstance' {
@@ -556,7 +574,7 @@ function Expand-CatalogInstance {
                 }
             }
             if (-not $optName) { $optName = Get-DefinitionTail $optId }
-            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = $optName })
+            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = $optName; Info = $rowInfo; InfoUrl = $rowInfoUrl })
             foreach ($child in (Get-PropList $cv 'children')) {
                 Expand-CatalogInstance -Instance $child -Defs $Defs -Prefix $display -Rows $Rows
             }
@@ -577,7 +595,7 @@ function Expand-CatalogInstance {
                 if (-not $optName) { $optName = Get-DefinitionTail $optId }
                 $labels += $optName
             }
-            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = ($labels -join '; ') })
+            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = ($labels -join '; '); Info = $rowInfo; InfoUrl = $rowInfoUrl })
             $idx = 0
             foreach ($cv in $vals) {
                 foreach ($child in (Get-PropList $cv 'children')) {
@@ -593,7 +611,7 @@ function Expand-CatalogInstance {
             $val = Get-Prop $sv 'value'
             if ($svType -like '*Secret*') { $val = '(secret - not shown)' }
             elseif ($svType -like '*Reference*') { $val = Resolve-ReusableSettingName ([string]$val) }
-            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = (Format-SettingValue $val) })
+            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = (Format-SettingValue $val); Info = $rowInfo; InfoUrl = $rowInfoUrl })
         }
 
         '*simpleSettingCollectionInstance' {
@@ -602,7 +620,7 @@ function Expand-CatalogInstance {
                 $svType = [string](Get-Prop $sv '@odata.type')
                 if ($svType -like '*Secret*') { $vals += '(secret)' } else { $vals += (Format-SettingValue (Get-Prop $sv 'value')) }
             }
-            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = ($vals -join '; ') })
+            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = ($vals -join '; '); Info = $rowInfo; InfoUrl = $rowInfoUrl })
         }
 
         '*groupSettingCollectionInstance' {
@@ -616,7 +634,7 @@ function Expand-CatalogInstance {
                 $idx++
             }
             if ($groups.Count -eq 0) {
-                [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = '(configured, empty)' })
+                [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = '(configured, empty)'; Info = $rowInfo; InfoUrl = $rowInfoUrl })
             }
         }
 
@@ -630,7 +648,7 @@ function Expand-CatalogInstance {
         default {
             # Unknown instance type: record what we can.
             $val = Get-Prop $Instance 'value'
-            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = (Format-SettingValue $val) })
+            [void]$Rows.Add([pscustomobject]@{ Key = $defId; Setting = $display; Value = (Format-SettingValue $val); Info = $rowInfo; InfoUrl = $rowInfoUrl })
         }
     }
 }
@@ -668,6 +686,27 @@ function Convert-CatalogSettings {
 
 #region ---------- legacy / admx / intent flattening ----------------------------------------
 
+function Get-OmaPlainText {
+    # Resolves an encrypted custom OMA-URI value to plaintext via the deviceConfiguration
+    # getOmaSettingPlainTextValue function. Returns $null on any failure (permissions, missing
+    # id, transient error) so the caller can fall back to a placeholder. NOTE: this writes the
+    # decrypted secret into the report/CSV - the export must then be treated as sensitive.
+    param([string]$ConfigId, [string]$SecretRefId)
+    if (-not $ConfigId -or -not $SecretRefId) { return $null }
+    if (-not $script:OmaPlainCache) { $script:OmaPlainCache = @{} }
+    $ck = "$ConfigId|$SecretRefId"
+    if ($script:OmaPlainCache.ContainsKey($ck)) { return $script:OmaPlainCache[$ck] }
+    $result = $null
+    try {
+        $uri = "beta/deviceManagement/deviceConfigurations/{0}/getOmaSettingPlainTextValue(secretReferenceValueId='{1}')" -f $ConfigId, $SecretRefId
+        $resp = Invoke-Rsop -Uri $uri
+        if ($resp -and $resp.ContainsKey('value')) { $result = [string]$resp['value'] }
+    }
+    catch { $result = $null }
+    $script:OmaPlainCache[$ck] = $result
+    return $result
+}
+
 function Convert-LegacyProperties {
     # Flattens a deviceConfiguration / deviceCompliancePolicy object's non-null typed properties.
     # Rows get a Category derived from the item's @odata.type so legacy settings group and
@@ -684,6 +723,7 @@ function Convert-LegacyProperties {
         'scriptcontent', 'filename'
     )
     $rows = New-Object System.Collections.Generic.List[object]
+    $cfgId = [string](Get-Prop $Policy 'id')   # needed to decrypt encrypted OMA-URI values
     $odataShort = ([string](Get-Prop $Policy '@odata.type')) -replace '#microsoft.graph.', ''
     $rowCategory = $FallbackCategory
     if ($odataShort) {
@@ -710,7 +750,14 @@ function Convert-LegacyProperties {
                     $omaVal = (Format-SettingValue $omaVal)
                 }
                 $enc = Get-Prop $oma 'isEncrypted'
-                if ($enc) { $omaVal = '(encrypted value - view in portal)' }
+                if ($enc) {
+                    # encrypted OMA values come back null; fetch the plaintext via the
+                    # getOmaSettingPlainTextValue function (writes the secret into the report)
+                    $secretRef = [string](Get-Prop $oma 'secretReferenceValueId')
+                    $plain = Get-OmaPlainText -ConfigId $cfgId -SecretRefId $secretRef
+                    if ($null -ne $plain -and $plain -ne '') { $omaVal = $plain }
+                    else { $omaVal = '(encrypted value - could not decrypt; view in portal)' }
+                }
                 [void]$rows.Add([pscustomobject]@{
                     Key      = "oma:$omaUri"
                     Setting  = "Custom OMA-URI: $omaName ($omaUri)"
@@ -2213,6 +2260,8 @@ function Resolve-DeviceRsop {
                     Setting     = $s.Setting
                     Value       = $s.Value
                     Category    = [string]$s.Category
+                    Info        = $s.Info
+                    InfoUrl     = $s.InfoUrl
                     PolicyId    = $p.Id
                     PolicyName  = $p.Name + $tag
                     FamilyLabel = $p.FamilyLabel
@@ -2228,6 +2277,8 @@ function Resolve-DeviceRsop {
                     Setting     = $s.Setting
                     Value       = $s.Value
                     Category    = [string]$s.Category
+                    Info        = $s.Info
+                    InfoUrl     = $s.InfoUrl
                     PolicyId    = $p.Id
                     PolicyName  = $p.Name
                     FamilyLabel = $p.FamilyLabel
@@ -2307,6 +2358,7 @@ function Resolve-DeviceRsop {
 
     return [pscustomobject]@{
         Device = [pscustomobject]@{
+            Scope           = 'device'
             DeviceName      = $mdName
             SerialNumber    = [string](Get-Prop $md 'serialNumber')
             IntuneDeviceId  = [string](Get-Prop $md 'id')
@@ -2418,7 +2470,7 @@ function Get-GroupAssignedRsop {
             if (-not $isExcl) {
                 foreach ($s in @($p.Settings)) {
                     [void]$settingRows.Add([pscustomobject]@{
-                        Key = $s.Key; Setting = $s.Setting; Value = $s.Value; Category = [string]$s.Category
+                        Key = $s.Key; Setting = $s.Setting; Value = $s.Value; Category = [string]$s.Category; Info = $s.Info; InfoUrl = $s.InfoUrl
                         PolicyId = $p.Id; PolicyName = $p.Name; FamilyLabel = $p.FamilyLabel
                         Via = $via; Conflict = ''
                     })
@@ -2430,6 +2482,7 @@ function Get-GroupAssignedRsop {
 
     return [pscustomobject]@{
         Device = [pscustomobject]@{
+            Scope = 'group'
             DeviceName = "GROUP: $gname"; SerialNumber = ''; IntuneDeviceId = ''; EntraDeviceId = $gid
             PrimaryUser = ''; OS = '(policies directly assigned to this group)'; Model = ''; LastSync = ''
             DeviceGroups = @(); UserGroups = @()
@@ -2530,7 +2583,7 @@ function Get-TenantInventoryRsop {
             # scope-excluded: keep the settings inspectable via Investigate's rule-out list
             foreach ($s in @($p.Settings)) {
                 [void]$shadowRows.Add([pscustomobject]@{
-                    Key = $s.Key; Setting = $s.Setting; Value = $s.Value; Category = [string]$s.Category
+                    Key = $s.Key; Setting = $s.Setting; Value = $s.Value; Category = [string]$s.Category; Info = $s.Info; InfoUrl = $s.InfoUrl
                     PolicyId = $p.Id; PolicyName = $p.Name; FamilyLabel = $p.FamilyLabel
                     Via = $via; Status = 'Excluded'
                 })
@@ -2540,7 +2593,7 @@ function Get-TenantInventoryRsop {
         $tag = $(if ($status -eq 'NotAssigned') { ' [not assigned]' } else { '' })
         foreach ($s in @($p.Settings)) {
             [void]$settingRows.Add([pscustomobject]@{
-                Key = $s.Key; Setting = $s.Setting; Value = $s.Value; Category = [string]$s.Category
+                Key = $s.Key; Setting = $s.Setting; Value = $s.Value; Category = [string]$s.Category; Info = $s.Info; InfoUrl = $s.InfoUrl
                 PolicyId = $p.Id; PolicyName = ($p.Name + $tag); FamilyLabel = $p.FamilyLabel
                 Via = $via; Conflict = ''
             })
@@ -2564,6 +2617,7 @@ function Get-TenantInventoryRsop {
     }
     return [pscustomobject]@{
         Device = [pscustomobject]@{
+            Scope = 'tenant'
             DeviceName = $name; SerialNumber = ''; IntuneDeviceId = ''; EntraDeviceId = ''
             PrimaryUser = ''
             OS = $osLine
@@ -2700,7 +2754,7 @@ mark{background:var(--amberbg);color:inherit;border-radius:3px}
 </head>
 <body>
 <h1>🔍 Intune Lens</h1>
-<div class="sub">Query: __QUERY__ &middot; Generated __GENERATED__ &middot; Tenant __TENANT__ &middot; v__VERSION__</div>
+<div class="sub">Query: __QUERY__ &middot; Generated by __ACCOUNT__ on __GENERATED__ &middot; v__VERSION__</div>
 
 <div class="card">
   <div class="row">
@@ -2866,11 +2920,12 @@ init();
 '@
 
 function Export-HtmlReport {
-    param($Results, [string]$Path, [string]$QueryLabel, [string]$Tenant)
+    param($Results, [string]$Path, [string]$QueryLabel, [string]$Tenant, [string]$Account)
     $payload = [pscustomobject]@{
         query     = $QueryLabel
         generated = (Get-Date).ToString('yyyy-MM-dd HH:mm')
         tenant    = $Tenant
+        account   = $Account
         version   = $script:Version
         warnings  = $script:RunLog.ToArray()
         devices   = @($Results)
@@ -2889,8 +2944,8 @@ function Export-HtmlReport {
     $html = $html.Replace('__DATA__', $json)
     $html = $html.Replace('__TITLE__', ("Intune Lens - " + $QueryLabel))
     $html = $html.Replace('__QUERY__', [System.Net.WebUtility]::HtmlEncode($QueryLabel))
-    $html = $html.Replace('__GENERATED__', (Get-Date).ToString('yyyy-MM-dd HH:mm'))
-    $html = $html.Replace('__TENANT__', [System.Net.WebUtility]::HtmlEncode($Tenant))
+    $html = $html.Replace('__GENERATED__', (Get-Date).ToString('dd-MM-yyyy'))
+    $html = $html.Replace('__ACCOUNT__', [System.Net.WebUtility]::HtmlEncode($(if ($Account) { $Account } else { 'unknown account' })))
     $html = $html.Replace('__VERSION__', $script:Version)
     Set-Content -Path $Path -Value $html -Encoding UTF8
     Write-Good ("HTML report: {0}" -f (Resolve-Path $Path))
@@ -3038,9 +3093,9 @@ function Resolve-QueryResults {
 }
 
 function Export-RsopResults {
-    param($Results, [string]$Label, [string]$Tenant, [string]$HtmlPath, [string]$CsvPath, [string]$JsonPath)
+    param($Results, [string]$Label, [string]$Tenant, [string]$Account, [string]$HtmlPath, [string]$CsvPath, [string]$JsonPath)
     foreach ($r in @($Results)) { Show-ConsoleSummary -Result $r }
-    if ($HtmlPath) { Export-HtmlReport -Results @($Results) -Path $HtmlPath -QueryLabel $Label -Tenant $Tenant }
+    if ($HtmlPath) { Export-HtmlReport -Results @($Results) -Path $HtmlPath -QueryLabel $Label -Tenant $Tenant -Account $Account }
     if ($CsvPath) {
         Get-CsvRows -Results @($Results) | Export-Csv -Path $CsvPath -NoTypeInformation -Encoding UTF8
         Write-Good ("CSV export: {0}" -f (Resolve-Path $CsvPath))
@@ -3169,7 +3224,7 @@ function Invoke-InteractiveMenu {
 
         $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
         $htmlPath = Join-Path (Get-Location) ("IntuneLens-{0}.html" -f $stamp)
-        Export-RsopResults -Results $q.Results -Label $q.Label -Tenant $TenantKey -HtmlPath $htmlPath
+        Export-RsopResults -Results $q.Results -Label $q.Label -Tenant $TenantKey -Account $GraphCtx.Account -HtmlPath $htmlPath
 
         $open = (Read-Host "  Open the HTML report now? [Y/n]").Trim().ToUpper()
         if ($open -ne 'N') { Open-File -Path $htmlPath }
@@ -3224,7 +3279,7 @@ if (-not $q -or @($q.Results).Count -eq 0) {
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 if (-not $ExportHtml -and -not $NoHtml) { $ExportHtml = Join-Path (Get-Location) ("IntuneLens-{0}.html" -f $stamp) }
 
-Export-RsopResults -Results $q.Results -Label $q.Label -Tenant $tenantKey -HtmlPath $ExportHtml -CsvPath $ExportCsv -JsonPath $ExportJson
+Export-RsopResults -Results $q.Results -Label $q.Label -Tenant $tenantKey -Account $ctx.Account -HtmlPath $ExportHtml -CsvPath $ExportCsv -JsonPath $ExportJson
 
 $elapsed = (Get-Date) - $script:StartTime
 Write-Host ""

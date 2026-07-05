@@ -8,18 +8,18 @@
 :root{
   --bg:#f4f6f9;--card:#ffffff;--ink:#16202e;--muted:#5f6b7c;--line:#dfe4ea;--accent:#2458d6;--accent-ink:#ffffff;
   --chip:#eaeef4;--red:#b42323;--redbg:#fbe9e9;--amber:#8a5c00;--amberbg:#fff2cf;--green:#156f36;--greenbg:#e4f5ea;
-  --blue:#134a9b;--bluebg:#e7effc;--mark:#ffe89c;--focus:#16202e;
+  --blue:#134a9b;--bluebg:#e7effc;--mark:#ffe89c;--focus:#16202e;--ring:rgba(36,88,214,.20);
 }
 html[data-theme="dark"]{
   --bg:#10131a;--card:#191e29;--ink:#e7eaf1;--muted:#96a0b1;--line:#2a3140;--accent:#7aa2ff;--accent-ink:#0d1524;
   --chip:#232a38;--red:#ff8484;--redbg:#3b2020;--amber:#e8b64c;--amberbg:#3a3220;--green:#5cd991;--greenbg:#1c3527;
-  --blue:#8ab4ff;--bluebg:#1d2b45;--mark:#7a5d00;--focus:#ffffff;
+  --blue:#8ab4ff;--bluebg:#1d2b45;--mark:#7a5d00;--focus:#ffffff;--ring:rgba(122,162,255,.26);
 }
 @media (prefers-color-scheme: dark){
   html:not([data-theme]){
     --bg:#10131a;--card:#191e29;--ink:#e7eaf1;--muted:#96a0b1;--line:#2a3140;--accent:#7aa2ff;--accent-ink:#0d1524;
     --chip:#232a38;--red:#ff8484;--redbg:#3b2020;--amber:#e8b64c;--amberbg:#3a3220;--green:#5cd991;--greenbg:#1c3527;
-    --blue:#8ab4ff;--bluebg:#1d2b45;--mark:#7a5d00;--focus:#ffffff;
+    --blue:#8ab4ff;--bluebg:#1d2b45;--mark:#7a5d00;--focus:#ffffff;--ring:rgba(122,162,255,.26);
   }
 }
 *{box-sizing:border-box}
@@ -32,6 +32,10 @@ h1{font-size:19px;margin:0}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 select,input[type=text]{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;max-width:230px}
 input[type=text]{flex:1;min-width:220px;max-width:none}
+input[type=text]:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.search{position:relative;flex:0 1 230px;min-width:170px;max-width:230px;display:flex;align-items:center}
+.search input[type=text]{min-width:0;width:100%;padding-left:32px}
+.search-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:12.5px;opacity:.55;pointer-events:none;line-height:1}
 .btn{background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;font-weight:600}
 .btn.ghost{background:var(--chip);color:var(--ink);font-weight:500}
 label.chk{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12.5px;white-space:nowrap;cursor:pointer}
@@ -40,10 +44,30 @@ label.chk{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:1
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
 .tab .n{background:var(--chip);border-radius:9px;padding:0 7px;font-size:11px;margin-left:4px}
 .tblwrap{overflow-x:auto}
+/* On desktop, let the long list tables escape the horizontal-scroll wrapper so their
+   headers can stick to the viewport (a scroll-container ancestor breaks position:sticky).
+   Narrow screens keep the wrapper's horizontal scroll (headers stop sticking there). */
+@media(min-width:1000px){#pane-settings .tblwrap,#pane-policies .tblwrap,#pane-investigate .tblwrap{overflow:visible}}
 table{border-collapse:collapse;width:100%;font-size:12.8px}
 th{position:sticky;top:0;background:var(--card);text-align:left;padding:7px 9px;border-bottom:2px solid var(--line);color:var(--muted);font-weight:600;white-space:nowrap;cursor:pointer;user-select:none}
+/* Only the long list tables scroll with the page (their wrappers are overflow:visible on
+   desktop), so only their headers offset below the sticky filter bar. Tables still inside an
+   overflow wrapper (overview summary, matrix, inspector) keep top:0 relative to that wrapper. */
+#pane-settings thead th,#pane-policies thead th,#pane-investigate thead th{top:var(--stickytop,0px)}
 th .arr{opacity:.6;font-size:10px}
-td{padding:5px 9px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
+td{padding:5px 9px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:break-word}
+td.nowrap,th.nowrap{white-space:nowrap}
+td.num{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+th.num{text-align:right}
+/* A single long unbroken value (compact JSON, a URL, a hash) has no natural wrap point, so
+   letting the Value column auto-size to it can balloon the whole table past the viewport
+   width (auto table layout sizes every column to its widest cell). Cap it; overflow-wrap
+   above still lets normal multi-word values wrap normally within that width. */
+td.val,th.val{max-width:380px}
+/* Custom OMA-URI setting names embed their full CSP path in parentheses (one unbroken run,
+   same reasoning as .val above) — cap so it can't do the same to the Setting column. */
+td.stg,th.stg{max-width:420px}
+#insp th{position:static;top:auto}
 tr:hover td{background:var(--chip)}
 .rowlink{cursor:pointer}
 .badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
@@ -55,7 +79,7 @@ tr:hover td{background:var(--chip)}
 .small{color:var(--muted);font-size:11.5px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.8px}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
-.vwrap{max-height:3.1em;overflow:hidden;position:relative;cursor:default}
+.vwrap{max-height:3.1em;overflow:hidden;position:relative;cursor:default;white-space:pre-wrap}
 .vwrap.expandable{cursor:pointer}
 .vwrap.expandable::after{content:"⌄ more";position:absolute;right:0;bottom:0;background:var(--card);color:var(--accent);font-size:10.5px;padding-left:8px}
 tr:hover .vwrap.expandable::after{background:var(--chip)}
@@ -66,6 +90,21 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
 .stat b{font-size:22px;display:block;line-height:1.2}
 .stat span{color:var(--muted);font-size:12px}
 .stat.warn b{color:var(--red)}
+.stat.click{cursor:pointer;transition:border-color .12s,transform .08s;text-align:left;width:100%;font:inherit;color:inherit}
+.stat.click:hover{border-color:var(--accent)}
+.stat.click:active{transform:translateY(1px)}
+.stat.click:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.scope-tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--accent);background:var(--bluebg);border-radius:5px;padding:2px 8px;margin-bottom:8px}
+.sbd-bar{height:6px;border-radius:4px;background:var(--line);overflow:hidden;margin:10px 0 4px;display:flex}
+.sbd-bar>i{display:block;height:100%}
+.statusbd{display:flex;flex-direction:column;gap:1px;margin-top:6px}
+.sbd-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:6px 8px;cursor:pointer;color:var(--ink);font-size:13px}
+.sbd-row:hover{background:var(--chip)}
+.sbd-row:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+.sbd-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;background:var(--muted)}
+.sbd-dot.applying{background:var(--green)}.sbd-dot.excluded{background:var(--red)}.sbd-dot.notassigned{background:var(--muted)}.sbd-dot.unknown{background:var(--amber)}
+.sbd-lbl{flex:1}.sbd-n{font-weight:700;font-variant-numeric:tabular-nums}.sbd-go{color:var(--muted);font-size:11px;opacity:0}
+.sbd-row:hover .sbd-go{opacity:1}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:900px){.grid2{grid-template-columns:1fr}}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:3px 10px;font-size:12.8px}
@@ -87,7 +126,6 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
 .chipgroup{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .chiphead{width:100%;font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin:0 0 -1px}
 .tchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;line-height:1.15;min-height:32px;cursor:pointer}
-.tchip .st{width:11px;text-align:center;font-weight:800;flex:0 0 auto}
 .tchip .ico{font-size:14px;line-height:1}
 .tchip:hover{border-color:var(--accent)}
 .tchip.auto{border-color:var(--accent);border-width:1.5px;color:var(--accent);background:var(--card);font-weight:600}
@@ -123,14 +161,18 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
 #insp{position:fixed;top:0;right:0;height:100%;width:min(480px,94vw);background:var(--card);border-left:1px solid var(--line);box-shadow:-10px 0 28px rgba(0,0,0,.22);z-index:60;display:none;flex-direction:column}
 #insp.open{display:flex}
 #insp .ihead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
-#insp .ihead h2{margin:5px 0 0;font-size:15px;line-height:1.3;word-break:break-word}
+#insp .ihead h2{margin:5px 0 0;font-size:15px;line-height:1.3;overflow-wrap:break-word}
 #insp .ibody{padding:4px 16px 24px;overflow-y:auto}
 #insp h4{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-#insp .ival{white-space:pre-wrap;word-break:break-word;background:var(--chip);border-radius:6px;padding:8px 10px;font-size:12.5px;max-height:300px;overflow:auto}
+#insp .ival{white-space:pre-wrap;overflow-wrap:break-word;background:var(--chip);border-radius:6px;padding:8px 10px;font-size:12.5px;max-height:300px;overflow:auto}
+#insp .ibody .mono{overflow-wrap:break-word}
 #insp ul{margin:4px 0;padding-left:18px}
 #insp li{margin:2px 0;font-size:12.5px}
 #insp table{font-size:12.3px}
 #insp .xbtn{background:none;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:2px 6px;line-height:1}
+#insp .learn-info{font-size:12.5px;color:var(--ink);background:var(--bluebg);border-left:3px solid var(--blue);border-radius:6px;padding:8px 11px;margin-top:4px}
+#insp .learn-link{display:inline-block;margin-top:8px;color:var(--accent);font-weight:600;text-decoration:none}
+#insp .learn-link:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -140,7 +182,7 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
     <div class="sub" id="subline"></div>
   </div>
   <div class="row">
-    <button class="btn ghost" id="themeBtn" title="Toggle light/dark">◐ theme</button>
+    <button class="btn ghost" id="themeBtn" title="Toggle light/dark">◐ Theme</button>
   </div>
 </div>
 
@@ -149,12 +191,16 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
 <div class="card controls">
   <div class="row">
     <select id="devSel" title="Device"></select>
-    <input type="text" id="q" placeholder="Search the report…  a|b = either, &quot;exact phrase&quot;, space = AND  (press / to focus)">
+    <div class="search">
+      <span class="search-ico" aria-hidden="true">🔍</span>
+      <input type="text" id="q" placeholder="Search the report…" title="a|b = either · &quot;exact phrase&quot; · space = AND · press / to focus">
+    </div>
     <select id="famSel"><option value="">All policy types</option></select>
     <select id="catSel"><option value="">All categories</option></select>
     <select id="polSel"><option value="">All policies</option></select>
-    <label class="chk" title="Settings &amp; Policies tabs: only items involved in a CONFLICT"><input type="checkbox" id="confOnly"> conflicts only</label>
-    <label class="chk" title="Settings tab only: hide rows where several policies set the same value"><input type="checkbox" id="hideDup"> hide duplicates</label>
+    <select id="statSel" title="Filter Settings &amp; Policies by assignment status"><option value="">All statuses</option></select>
+    <label class="chk" title="Settings &amp; Policies tabs: only items involved in a CONFLICT"><input type="checkbox" id="confOnly"> Conflicts only</label>
+    <label class="chk" title="Settings tab only: hide rows where several policies set the same value"><input type="checkbox" id="hideDup"> Hide duplicates</label>
     <button class="btn ghost" id="clearBtn">Clear</button>
     <button class="btn" id="csvBtn" title="CSV of the currently filtered settings">⬇ CSV (filtered)</button>
   </div>
@@ -170,14 +216,9 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
 </div>
 
 <div id="pane-overview">
-  <div class="card" id="ovInvestigate">
-    <b style="font-size:13px">🔎 Find the cause of a problem</b>
-    <span class="small"> — pick a topic to hunt for the policy responsible, or open <span class="linkish" onclick="showTab('investigate')">Investigate</span> to describe it in your own words:</span>
-    <div class="chipbar grouped" id="ovChips"></div>
-  </div>
   <div class="grid2">
     <div class="card">
-      <h3 style="margin:0 0 8px;font-size:14px">Device</h3>
+      <h3 id="devCardTitle" style="margin:0 0 8px;font-size:14px">Device</h3>
       <div class="kv" id="devInfo"></div>
     </div>
     <div class="card">
@@ -205,7 +246,7 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
   <div class="card" id="ivTableCard" style="display:none">
     <h3 style="margin:0 0 8px;font-size:14px">Matching settings</h3>
     <div class="tblwrap"><table id="tblIv">
-      <thead><tr><th title="⚑ = value looks restrictive for this setting name (heuristic - verify)"></th><th>Setting</th><th>Value</th><th>Policy</th><th>Status</th><th>Type</th><th>Matched on</th></tr></thead>
+      <thead><tr><th title="⚑ = value looks restrictive for this setting name (heuristic - verify)"></th><th class="stg">Setting</th><th class="val">Value</th><th>Policy</th><th>Status</th><th>Type</th><th>Matched on</th></tr></thead>
       <tbody></tbody>
     </table></div>
     <div class="small" id="ivRowCount" style="margin-top:6px"></div>
@@ -218,8 +259,8 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
     <div class="tblwrap"><table id="tblSettings">
       <thead><tr>
         <th data-k="Category">Category <span class="arr"></span></th>
-        <th data-k="Setting">Setting <span class="arr"></span></th>
-        <th data-k="Value">Value <span class="arr"></span></th>
+        <th data-k="Setting" class="stg">Setting <span class="arr"></span></th>
+        <th data-k="Value" class="val">Value <span class="arr"></span></th>
         <th data-k="PolicyName">Policy <span class="arr"></span></th>
         <th data-k="FamilyLabel">Type <span class="arr"></span></th>
         <th></th>
@@ -238,9 +279,9 @@ tr:hover .vwrap.expandable::after{background:var(--chip)}
         <th data-k="Name">Policy <span class="arr"></span></th>
         <th data-k="FamilyLabel">Type <span class="arr"></span></th>
         <th data-k="Detail">Template / baseline <span class="arr"></span></th>
-        <th data-k="SettingCount"># <span class="arr"></span></th>
-        <th data-k="Modified">Modified <span class="arr"></span></th>
-        <th data-k="Reported">Device reported <span class="arr"></span></th>
+        <th data-k="SettingCount" class="num" title="Number of settings this policy delivers"># <span class="arr"></span></th>
+        <th data-k="Modified" class="nowrap">Modified <span class="arr"></span></th>
+        <th data-k="Reported" class="nowrap">Device reported <span class="arr"></span></th>
         <th data-k="Via">Assigned / applies via <span class="arr"></span></th>
       </tr></thead>
       <tbody></tbody>
@@ -273,6 +314,38 @@ let sortS = {k:"", d:1}, sortP = {k:"", d:1};
 
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rxEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+// CSP/OMA-URI paths and keys are one long run with no spaces, so browsers have no natural
+// place to wrap them and fall back to splitting mid-word. <wbr> after each separator gives
+// them a wrap point at path/segment boundaries instead, without touching the actual text.
+const escPath = s => esc(s).replace(/([\/_.])/g,"$1<wbr>");
+// Same wrap-point hint, but for text that has already been run through hl() (so it may
+// contain <mark> tags): only touch the plain-text segments, never inside a tag.
+const wbrify = html => String(html).split(/(<[^>]+>)/).map(part=>/^</.test(part)?part:part.replace(/([\/_.])/g,"$1<wbr>")).join("");
+// Detect OMA-URI/SyncML-style XML values so we can pretty-print them for display only.
+const isXmlValue = v => /^\s*<[^>]+>/.test(String(v==null?"":v));
+// Indent an unformatted XML string for display. Never touches the underlying data value —
+// callers run this only on a display copy, the raw string is still what search/CSV/export use.
+// Splits only at ">less-than" boundaries that already exist (no whitespace inserted inside a
+// tag's text content, e.g. base64 <Data> blobs stay intact on one line) then indents by depth.
+function prettyXml(xml){
+  const raw = String(xml==null?"":xml);
+  try{
+    const x = raw.trim().replace(/>\s*</g,"><").replace(/></g,">\n<");
+    const lines = x.split("\n"); const out = []; let pad = 0;
+    for(const l of lines){
+      const line = l.trim(); if(!line) continue;
+      const isClose = /^<\//.test(line);
+      const selfClose = /\/>$/.test(line) || /\?>$/.test(line);
+      const closesInline = /<\/[^\s>]+>$/.test(line);
+      if(isClose) pad = Math.max(0, pad-1);
+      out.push("  ".repeat(pad)+line);
+      if(!isClose && !selfClose && !closesInline) pad++;
+    }
+    return out.join("\n");
+  } catch(e){ return raw; }
+}
+// "yyyy-mm-dd HH:MM" (as emitted by the generator) -> "dd-mm-yyyy"; leaves other formats untouched.
+const fmtGenDate = g => { const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(g==null?"":g)); return m?m[3]+"-"+m[2]+"-"+m[1]:String(g==null?"":g); };
 function parseQuery(q){
   // space-separated tokens are ANDed; a|b within a token means either; "quoted phrases" stay whole
   const groups=[]; const re=/"([^"]+)"|(\S+)/g; let m;
@@ -293,6 +366,16 @@ function hl(text, q){
 }
 const D = () => DATA.devices[cur];
 const SH = () => (D().Shadow||[]);
+// Distinguish a real per-device report from an inventory/scope pseudo-device (tenant-wide or a
+// group). Prefer an explicit Scope field if the generator sets one, else infer from the shape:
+// inventory pseudo-devices carry no serial / model / user / groups and a recognisable name.
+function deviceScope(g){
+  if(g&&g.Scope) return g.Scope;
+  const nm=String(g&&g.DeviceName||"");
+  if(/^GROUP:/.test(nm)) return "group";
+  if(g&&!g.SerialNumber&&!g.Model&&!g.PrimaryUser&&!(g.DeviceGroups&&g.DeviceGroups.length)&&!(g.UserGroups&&g.UserGroups.length)) return "tenant";
+  return "device";
+}
 
 /* ---------- shared filter state -----------------------------------------------------------
    One filter bar drives the whole report: Settings, Policies, Conflicts and Investigate all
@@ -315,22 +398,33 @@ function rebuildIndex(){
   SH().forEach(s=>{ (MAPS.cats[s.PolicyId]=MAPS.cats[s.PolicyId]||new Set()).add(s.Category||""); });
 }
 
+// status filter groups (used by the Status dropdown and the clickable Overview cards)
+const STAT_GROUPS={
+  applying:{label:"Applies / assigned",sts:["Applies","Assigned"]},
+  excluded:{label:"Excluded / filtered out",sts:["Excluded","FilteredOut"]},
+  notassigned:{label:"Not assigned",sts:["NotAssigned"]},
+  unknown:{label:"Unknown / reported-only",sts:["Unknown","ReportedOnly"]}
+};
+const statusMatches=(st,grp)=>!grp||(STAT_GROUPS[grp]?STAT_GROUPS[grp].sts.includes(st):true);
+
 function filterState(){
   return {
     groups: parseQuery(document.getElementById("q").value),
     fam: document.getElementById("famSel").value,
     cat: document.getElementById("catSel").value,
     pol: document.getElementById("polSel").value,
+    stat: document.getElementById("statSel").value,
     confOnly: document.getElementById("confOnly").checked,
     hideDup: document.getElementById("hideDup").checked
   };
 }
-const filtersActive=f=>!!(f.groups.length||f.fam||f.cat||f.pol||f.confOnly||f.hideDup);
+const filtersActive=f=>!!(f.groups.length||f.fam||f.cat||f.pol||f.stat||f.confOnly||f.hideDup);
 
 function settingInScope(s,f){
   if(f.fam&&s.FamilyLabel!==f.fam)return false;
   if(f.cat&&s.Category!==f.cat)return false;
   if(f.pol&&s.PolicyId!==f.pol)return false;
+  if(f.stat){const p=POLBYID[s.PolicyId];if(!statusMatches(p&&p.Status,f.stat))return false;}
   if(f.confOnly&&s.Conflict!=="CONFLICT")return false;
   if(f.hideDup&&s.Conflict==="Duplicate")return false;
   if(f.groups.length){
@@ -352,6 +446,7 @@ function shadowInScope(s,f){
 function policyInScope(p,f){
   if(f.fam&&p.FamilyLabel!==f.fam)return false;
   if(f.pol&&p.PolicyId!==f.pol)return false;
+  if(f.stat&&!statusMatches(p.Status,f.stat))return false;
   if(f.cat&&!(MAPS.cats[p.PolicyId]&&MAPS.cats[p.PolicyId].has(f.cat)))return false;
   if(f.confOnly&&!MAPS.conf[p.PolicyId])return false;
   if(f.groups.length){
@@ -373,10 +468,12 @@ function conflictInScope(c,f){
 function filteredSettings(){ const f=filterState(); return D().Settings.filter(s=>settingInScope(s,f)); }
 
 function init(){
-  document.getElementById("subline").textContent =
-    DATA.query+"  ·  generated "+DATA.generated+"  ·  tenant "+DATA.tenant+"  ·  v"+DATA.version;
+  const genDate=fmtGenDate(DATA.generated);
+  const genBy=DATA.account?"Generated by "+DATA.account+" on "+genDate:"Generated on "+genDate;
+  // top subline shows the report scope only; the generation credit lives in the footer (bottom)
+  document.getElementById("subline").textContent = DATA.query;
   document.getElementById("footer").textContent =
-    "Intune Lens v"+DATA.version+" — "+DATA.query+" — "+DATA.generated;
+    "Intune Lens — "+DATA.query+" — "+genBy;
 
   const sel = document.getElementById("devSel");
   DATA.devices.forEach((d,i)=>{
@@ -385,7 +482,7 @@ function init(){
     sel.appendChild(o);
   });
   sel.onchange=()=>{cur=parseInt(sel.value); rebuildIndex(); buildFilters(); closeInspector(); renderAll();};
-  ["q","famSel","catSel","polSel","confOnly","hideDup"].forEach(id=>{
+  ["q","famSel","catSel","polSel","statSel","confOnly","hideDup"].forEach(id=>{
     const el=document.getElementById(id);
     el.addEventListener(el.tagName==="INPUT"&&el.type==="text"?"input":"change",renderAll);
   });
@@ -400,15 +497,6 @@ function init(){
   };
   document.getElementById("ivChips").addEventListener("click",e=>{
     const b=e.target.closest("[data-topic]"); if(b) ivToggle(b.dataset.topic);
-  });
-  document.getElementById("ovChips").innerHTML=CATS.map(c=>
-    '<div class="chipgroup"><div class="chiphead">'+esc(c.name)+'</div>'+
-    TOPICS.filter(t=>t.cat===c.id).map(t=>
-      '<button type="button" class="tchip" data-topic="'+esc(t.id)+'" title="'+esc(t.label+" — "+t.sub)+'">'+
-      '<span class="ico" aria-hidden="true">'+t.icon+'</span><span class="lbl">'+esc(t.label)+'</span></button>').join("")+
-    '</div>').join("");
-  document.getElementById("ovChips").addEventListener("click",e=>{
-    const b=e.target.closest("[data-topic]"); if(b) ivEngage(b.dataset.topic);
   });
   document.getElementById("ivSuspects").addEventListener("click",e=>{
     const insp=e.target.closest("[data-insp]");
@@ -449,6 +537,14 @@ function init(){
   });
   document.getElementById("toTop").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
 
+  // keep the sticky table headers pinned just below the sticky filter bar (whose height
+  // changes when the filter note appears or the tab row wraps) instead of hiding behind it
+  const controls=document.querySelector(".controls");
+  const updateStickyTop=()=>document.documentElement.style.setProperty("--stickytop",Math.round(controls.getBoundingClientRect().height)+"px");
+  if(window.ResizeObserver) new ResizeObserver(updateStickyTop).observe(controls);
+  window.addEventListener("resize",updateStickyTop);
+  updateStickyTop();
+
   document.querySelectorAll("#tblSettings th[data-k]").forEach(th=>{
     th.onclick=()=>{ sortS = {k:th.dataset.k, d: sortS.k===th.dataset.k? -sortS.d : 1}; renderSettings(); };
   });
@@ -467,7 +563,7 @@ function showTab(name){
 }
 
 function clearFilters(){
-  ["famSel","catSel","polSel"].forEach(id=>document.getElementById(id).value="");
+  ["famSel","catSel","polSel","statSel"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("q").value="";
   document.getElementById("confOnly").checked=false;
   document.getElementById("hideDup").checked=false;
@@ -494,6 +590,14 @@ function buildFilters(){
     sel.appendChild(o);
   });
   if([...sel.options].some(o=>o.value===old)) sel.value=old;
+
+  // status dropdown: only offer the groups that actually occur, with live counts
+  const statSel=document.getElementById("statSel"); const oldStat=statSel.value;
+  const scounts={};
+  d.Policies.forEach(p=>{ for(const k in STAT_GROUPS){ if(STAT_GROUPS[k].sts.includes(p.Status)) scounts[k]=(scounts[k]||0)+1; } });
+  statSel.innerHTML='<option value="">All statuses</option>'+
+    Object.keys(STAT_GROUPS).filter(k=>scounts[k]).map(k=>'<option value="'+k+'">'+esc(STAT_GROUPS[k].label)+' ('+scounts[k]+')</option>').join("");
+  if([...statSel.options].some(o=>o.value===oldStat)) statSel.value=oldStat;
 }
 
 function renderAll(){
@@ -518,22 +622,52 @@ function renderAll(){
 
 function renderOverview(){
   const d=D();
-  const applied=d.Policies.filter(p=>p.Status==="Applies"||p.Status==="Assigned").length;
-  const excl=d.Policies.filter(p=>p.Status==="Excluded"||p.Status==="FilteredOut"||p.Status==="NotAssigned").length;
-  const unk=d.Policies.filter(p=>p.Status==="Unknown"||p.Status==="ReportedOnly").length;
-  document.getElementById("statCards").innerHTML=
-    '<div class="stat"><b>'+applied+'</b><span>policies apply</span></div>'+
-    '<div class="stat"><b>'+d.Settings.length+'</b><span>settings</span></div>'+
-    '<div class="stat'+(d.Conflicts.length?" warn":"")+'"><b>'+d.Conflicts.length+'</b><span>conflicts</span></div>'+
-    '<div class="stat"><b>'+excl+'</b><span>excluded / filtered / unassigned</span></div>'+
-    '<div class="stat'+(unk?" warn":"")+'"><b>'+unk+'</b><span>unknown / reported-only</span></div>';
-
   const g=d.Device;
-  const kv=[["Name",g.DeviceName],["Serial",g.SerialNumber],["OS",g.OS],["Model",g.Model],
-            ["Primary user",g.PrimaryUser],["Last sync",g.LastSync],
-            ["Device groups",(g.DeviceGroups||[]).join(", ")],["User groups",(g.UserGroups||[]).join(", ")]];
-  document.getElementById("devInfo").innerHTML =
-    kv.filter(x=>x[1]).map(x=>'<div class="k">'+esc(x[0])+'</div><div>'+esc(x[1])+'</div>').join("");
+  const scope=deviceScope(g);
+  const isDev=scope==="device";
+  const cnt={applying:0,excluded:0,notassigned:0,unknown:0};
+  d.Policies.forEach(p=>{ for(const k in STAT_GROUPS){ if(STAT_GROUPS[k].sts.includes(p.Status)) cnt[k]++; } });
+  const nConf=d.Conflicts.length;
+
+  // adaptive stat cards — clickable ones apply the matching filter and jump to the right tab
+  const card=(n,label,opts)=>{ opts=opts||{};
+    return (opts.act?'<button type="button" class="stat click'+(opts.warn?" warn":"")+'" '+opts.act+'>':'<div class="stat'+(opts.warn?" warn":"")+'">')+
+      '<b>'+n+'</b><span>'+label+'</span>'+(opts.act?'</button>':'</div>'); };
+  let cards=card(cnt.applying,isDev?"policies apply":"policies assigned",{act:"onclick=\"applyStatus('applying')\""})+
+    card(d.Settings.length,"settings",{act:"onclick=\"showTab('settings')\""})+
+    card(nConf,"conflict"+(nConf===1?"":"s"),{warn:nConf>0,act:nConf?"onclick=\"applyConflicts()\"":""});
+  if(cnt.excluded) cards+=card(cnt.excluded,"excluded / filtered",{act:"onclick=\"applyStatus('excluded')\""});
+  if(cnt.notassigned) cards+=card(cnt.notassigned,"not assigned",{act:"onclick=\"applyStatus('notassigned')\""});
+  if(cnt.unknown) cards+=card(cnt.unknown,"unknown / reported-only",{warn:true,act:"onclick=\"applyStatus('unknown')\""});
+  document.getElementById("statCards").innerHTML=cards;
+
+  const title=document.getElementById("devCardTitle");
+  const dinfo=document.getElementById("devInfo");
+  if(isDev){
+    title.textContent="Device";
+    dinfo.className="kv";
+    const kv=[["Name",g.DeviceName],["Serial",g.SerialNumber],["OS",g.OS],["Model",g.Model],
+              ["Primary user",g.PrimaryUser],["Last sync",g.LastSync],
+              ["Device groups",(g.DeviceGroups||[]).join(", ")],["User groups",(g.UserGroups||[]).join(", ")]];
+    dinfo.innerHTML=kv.filter(x=>x[1]).map(x=>'<div class="k">'+esc(x[0])+'</div><div>'+esc(x[1])+'</div>').join("");
+  } else {
+    // inventory / group scope: the device identity is meaningless here, so show the scope and a
+    // clickable status breakdown (the single most useful thing about a whole-tenant export)
+    title.textContent=scope==="group"?"Scope — group":"Scope — tenant";
+    dinfo.className="";
+    const tag=scope==="group"?"Group":(/scoped/i.test(g.DeviceName||"")?"Scoped":"Tenant-wide");
+    const total=d.Policies.length||1;
+    const colr={applying:"green",excluded:"red",notassigned:"muted",unknown:"amber"};
+    const seg=k=>cnt[k]?'<i style="width:'+(cnt[k]/total*100).toFixed(1)+'%;background:var(--'+colr[k]+')"></i>':"";
+    const lbl={applying:"Assigned",excluded:"Excluded / filtered",notassigned:"Not assigned",unknown:"Unknown / reported"};
+    const rows=Object.keys(STAT_GROUPS).filter(k=>cnt[k]).map(k=>
+      '<button type="button" class="sbd-row" onclick="applyStatus(\''+k+'\')"><span class="sbd-dot '+k+'"></span>'+
+      '<span class="sbd-lbl">'+esc(lbl[k])+'</span><span class="sbd-n">'+cnt[k]+'</span><span class="sbd-go">filter →</span></button>').join("");
+    dinfo.innerHTML='<span class="scope-tag">'+esc(tag)+'</span><div class="small">'+esc(g.OS||"")+'</div>'+
+      '<div class="sbd-bar">'+seg("applying")+seg("excluded")+seg("notassigned")+seg("unknown")+'</div>'+
+      '<div class="statusbd">'+rows+'</div>'+
+      '<div class="small" style="margin-top:6px;padding:0 8px">Click a status to filter the whole report.</div>';
+  }
 
   const fams={};
   d.Policies.forEach(p=>{ if(p.Status==="Applies"||p.Status==="Assigned"){ fams[p.FamilyLabel]=fams[p.FamilyLabel]||{p:0,s:0}; fams[p.FamilyLabel].p++; fams[p.FamilyLabel].s+=p.SettingCount; }});
@@ -587,10 +721,13 @@ function renderSettings(){
     if(s.Conflict==="CONFLICT") badge='<span class="badge b-conflict">CONFLICT</span>';
     else if(s.Conflict==="Duplicate") badge='<span class="badge b-dup">dup</span>';
     const isJson=/^[\[{]/.test(s.Value||"");
+    const isXml=isXmlValue(s.Value);
+    const dispVal=isXml?prettyXml(s.Value):(s.Value||"");
+    const xmlMulti=isXml&&/\n/.test(dispVal);
     const long=(s.Value||"").length>110;
-    const vinner=(isJson?'<span class="mono">':'')+hl(s.Value,q)+(isJson?'</span>':'');
-    const v=(long||isJson)?'<div class="vwrap expandable" onclick="event.stopPropagation();this.classList.toggle(\'open\')">'+vinner+'</div>':vinner;
-    tr.innerHTML="<td class='small'>"+hl(s.Category||"",q)+"</td><td>"+hl(s.Setting,q)+"</td><td>"+v+
+    const vinner=(isJson||isXml?'<span class="mono">':'')+hl(dispVal,q)+(isJson||isXml?'</span>':'');
+    const v=(long||isJson||xmlMulti)?'<div class="vwrap expandable" onclick="event.stopPropagation();this.classList.toggle(\'open\')">'+vinner+'</div>':vinner;
+    tr.innerHTML="<td class='small'>"+hl(s.Category||"",q)+"</td><td class='stg'>"+wbrify(hl(s.Setting,q))+"</td><td class='val'>"+v+
       "</td><td title='"+esc(s.Via||"")+"'>"+hl(s.PolicyName,q)+"</td><td class='small'>"+esc(s.FamilyLabel)+"</td><td>"+badge+"</td>";
     frag.appendChild(tr);
   });
@@ -608,11 +745,11 @@ function renderPolicies(){
   const tb=document.querySelector("#tblPolicies tbody");
   tb.innerHTML=rows.map(p=>{
     const cls="b-"+p.Status.toLowerCase();
-    return "<tr class='rowlink' data-pid='"+esc(p.PolicyId)+"'><td><span class='badge "+cls+"'>"+esc(p.Status)+"</span></td>"+
+    return "<tr class='rowlink' data-pid='"+esc(p.PolicyId)+"'><td class='nowrap'><span class='badge "+cls+"'>"+esc(p.Status)+"</span></td>"+
       "<td><span class='linkish' title='"+esc(p.Desc||"")+"'>"+hl(p.Name,q)+"</span>"+(p.Intent?' <span class="mt">'+esc(p.Intent)+'</span>':"")+"</td>"+
       "<td class='small'>"+esc(p.FamilyLabel)+"</td><td class='small'>"+esc(p.Detail||"")+"</td>"+
-      "<td>"+esc(p.SettingCount)+"</td><td class='small'>"+esc(p.Modified||"")+"</td>"+
-      "<td class='small'>"+esc(p.Reported||"")+"</td><td class='small'>"+hl(p.Via,q)+"</td></tr>";
+      "<td class='num'>"+esc(p.SettingCount)+"</td><td class='small nowrap'>"+esc(p.Modified||"")+"</td>"+
+      "<td class='small nowrap'>"+esc(p.Reported||"")+"</td><td class='small'>"+hl(p.Via,q)+"</td></tr>";
   }).join("");
   document.getElementById("polCount").textContent=rows.length+" of "+d.Policies.length+" policies shown · click a row for why it applies, assignments & filters";
 }
@@ -623,6 +760,15 @@ function filterByPolicy(pid){
   if(sel.value!==pid) sel.value="";
   closeInspector();
   showTab("settings"); renderAll();
+}
+function applyStatus(k){
+  const sel=document.getElementById("statSel");
+  sel.value=k; if(sel.value!==k) sel.value=""; // group absent (e.g. device report) -> no-op
+  closeInspector(); showTab("policies"); renderAll();
+}
+function applyConflicts(){
+  document.getElementById("confOnly").checked=true;
+  closeInspector(); showTab("conflicts"); renderAll();
 }
 
 function renderConflicts(){
@@ -700,16 +846,37 @@ function inspGoConflicts(pid){
   sel.value=pid; if(sel.value!==pid) sel.value="";
   closeInspector(); showTab("conflicts"); renderAll();
 }
+// Build a "Learn more" target for a setting: prefer the setting definition's own info URL
+// (Settings Catalog / Endpoint Security bake these in as data), otherwise fall back to a
+// Microsoft Learn search on the setting's leaf name (or its OMA-URI path for custom settings).
+function learnUrlFor(s){
+  const u=s&&s.InfoUrl?String(s.InfoUrl):"";
+  if(/^https?:\/\//i.test(u)) return u;
+  let t=String(s&&s.Setting||"").trim();
+  const oma=/\(([^()]*\/[^()]+)\)\s*$/.exec(t);            // "Custom OMA-URI: name (./path)" -> ./path
+  if(oma) t=oma[1];
+  else { const seg=t.split(" > "); t=seg[seg.length-1].trim(); }  // strip breadcrumb -> leaf name
+  return "https://learn.microsoft.com/en-us/search/?terms="+encodeURIComponent(t||String(s&&s.Setting||""));
+}
 function openSettingInspector(s){
   if(!s) return;
   const p=POLBYID[s.PolicyId];
   const isJson=/^[\[{]/.test(s.Value||"");
+  const isXml=isXmlValue(s.Value);
+  const dispVal=isXml?prettyXml(s.Value):(s.Value||"");
   let badges="";
   if(s.Conflict==="CONFLICT") badges='<span class="badge b-conflict">CONFLICT</span> ';
   else if(s.Conflict==="Duplicate") badges='<span class="badge b-dup">duplicate</span> ';
   else if(s.Status) badges='<span class="badge b-'+String(s.Status).toLowerCase()+'">'+esc(s.Status)+'</span> ';
-  const head='<div>'+badges+(s.Category?'<span class="mt">'+esc(s.Category)+'</span>':"")+'<h2>'+esc(s.Setting)+'</h2></div>';
-  let b='<h4>Value</h4><div class="ival'+(isJson?' mono':'')+'">'+esc(s.Value)+'</div>';
+  const head='<div>'+badges+(s.Category?'<span class="mt">'+esc(s.Category)+'</span>':"")+'<h2>'+escPath(s.Setting)+'</h2></div>';
+  let b='<h4>Value</h4><div class="ival'+(isJson||isXml?' mono':'')+'">'+esc(dispVal)+'</div>';
+  // concise Microsoft reference for the selected setting: its own baked description when
+  // available (Settings Catalog / Endpoint Security) plus a Learn link; always at least a link
+  const learnUrl=learnUrlFor(s);
+  b+='<h4>Microsoft Learn</h4>';
+  if(s.Info) b+='<div class="learn-info">'+esc(s.Info)+'</div>';
+  b+='<a class="learn-link" href="'+esc(learnUrl)+'" target="_blank" rel="noopener noreferrer">View on Microsoft Learn ↗</a>';
+  if(!s.InfoUrl) b+=' <span class="small">— opens a Learn search</span>';
   b+='<h4>Delivered by</h4><div><span class="linkish" onclick=\'openPolicyInspector('+JSON.stringify(String(s.PolicyId||""))+')\'>'+esc(s.PolicyName)+'</span>'+
      (p?' '+stBadge(p):"")+'<div class="small" style="margin-top:2px">'+esc(s.FamilyLabel)+(p&&p.Intent?' · intent: '+esc(p.Intent):"")+
      (p&&p.Reported?' · device reported: '+esc(p.Reported):"")+'</div></div>';
@@ -720,7 +887,7 @@ function openSettingInspector(s){
     b+='<h4>All values set for this setting</h4>'+c.Sources.map(x=>
       '<div class="conf-src"><span class="linkish" onclick=\'openPolicyInspector('+JSON.stringify(String(x.PolicyId||""))+')\'>'+esc(x.Policy)+'</span><b>'+esc(x.Value)+'</b></div>').join("");
   }
-  if(s.Key) b+='<h4>Setting key</h4><div class="small mono">'+esc(s.Key)+'</div>';
+  if(s.Key) b+='<h4>Setting key</h4><div class="small mono">'+escPath(s.Key)+'</div>';
   openInspector(head,b);
 }
 
@@ -802,6 +969,13 @@ const TOPICS=[
   hint:"Update ring + feature-update profile + expedite policy overlap; the strictest deadline wins. A pinned TargetReleaseVersion blocks upgrades silently."}
 ];
 const IV_STOP=new Set(["the","a","an","is","are","was","were","it","its","itself","my","our","your","on","in","to","of","by","and","or","not","no","cant","cannot","wont","dont","doesnt","didnt","why","what","who","when","how","keeps","keep","gets","get","got","getting","being","been","from","self","device","devices","user","users","computer","laptop","pc","machine","policy","policies","setting","settings","intune","windows","working","work","works","broken","issue","problem","error","help","cause","causing","some","all","every","still","again","suddenly","randomly","by"]);
+// Generic polarity / action words (and their stems). On their own they match hundreds of
+// unrelated settings ("Block macros", "Disable X"…), so a typed one is treated as a WEAK
+// term: it highlights and refines but does not by itself qualify a match or make a policy a
+// suspect. Distinctive words the admin types (app names, "usb", "bitlocker") stay strong,
+// and topic synonyms are always strong. This stops e.g. "usb blocked" ranking an Office
+// baseline #1 just because it has many "Block…" settings.
+const IV_WEAK=new Set(["block","blocked","deny","denied","deni","disable","disabled","disabl","enable","enabled","enabl","allow","allowed","off","turn","turned","hide","hidden","hid","prevent","prevented","restrict","restricted","stop","stopped","remove","removed","remov","force","forced","enforce","enforced","enforc"]);
 let ivOn=new Set(), ivOff=new Set(), ivPol=null;
 
 function ivAutoTopics(){
@@ -819,28 +993,25 @@ function ivActiveIds(){
   return {act,auto};
 }
 function ivTerms(actIds){
-  const terms=new Set();
-  TOPICS.forEach(t=>{ if(actIds.has(t.id)) t.terms.forEach(x=>terms.add(x)); });
+  const strong=new Set(), weak=new Set();
+  TOPICS.forEach(t=>{ if(actIds.has(t.id)) t.terms.forEach(x=>strong.add(x)); });
   parseQuery(document.getElementById("ivQ").value).flat().forEach(tok=>{
     if(tok.length<3||IV_STOP.has(tok)) return;
-    terms.add(tok);
     // light stemming so 'blocked'/'uninstalls' also hit 'Block'/'Uninstall'
-    let stem=tok.replace(/(ing|ed|es|s)$/,"");
-    if(stem.length>=4) terms.add(stem);
+    const stem=tok.replace(/(ing|ed|es|s)$/,"");
+    const bucket=(IV_WEAK.has(tok)||(stem.length>=4&&IV_WEAK.has(stem)))?weak:strong;
+    bucket.add(tok);
+    if(stem.length>=4) bucket.add(stem);
   });
-  return [...terms].sort((a,b)=>b.length-a.length);
+  weak.forEach(w=>{ if(strong.has(w)) weak.delete(w); }); // a topic-strong word wins
+  const all=[...strong,...weak].sort((a,b)=>b.length-a.length);
+  return {all, strong};
 }
 function ivToggle(id){
   const {act}=ivActiveIds();
   if(act.has(id)){ ivOff.add(id); ivOn.delete(id); }
   else { ivOn.add(id); ivOff.delete(id); }
   renderInvestigate();
-}
-function ivEngage(id){
-  ivOn.add(id); ivOff.delete(id);
-  showTab("investigate");
-  renderInvestigate();
-  document.getElementById("ivQ").focus();
 }
 function isCulprit(s){
   const v=String(s.Value==null?"":s.Value).toLowerCase().trim();
@@ -865,18 +1036,17 @@ function ivTitleCase(s){
 }
 function buildIvChips(){
   const {act,auto}=ivActiveIds();
-  // Chip state is signalled by a fixed-width leading glyph (not colour alone): ✓ engaged,
-  // ↻ auto-detected from the typed text, ✕ auto-detected but dismissed. The slot is always
-  // present so widths never reflow as the admin types.
+  // Chip state is shown by styling only (no glyph): engaged = filled highlight, auto-detected
+  // from the typed text = accent outline, auto-detected but dismissed = dimmed + struck-through.
   const mk=t=>{
-    let cls,st,why;
-    if(ivOn.has(t.id)){ cls="tchip on"; st="✓"; why="engaged — click to turn off"; }
-    else if(act.has(t.id)){ cls="tchip auto"; st="↻"; why="auto-detected from your text — click to turn off"; }
-    else if(auto.has(t.id)&&ivOff.has(t.id)){ cls="tchip off"; st="✕"; why="auto-detected but turned off — click to turn back on"; }
-    else { cls="tchip"; st=""; why="click to search this topic"; }
+    let cls,why;
+    if(ivOn.has(t.id)){ cls="tchip on"; why="engaged — click to turn off"; }
+    else if(act.has(t.id)){ cls="tchip auto"; why="auto-detected from your text — click to turn off"; }
+    else if(auto.has(t.id)&&ivOff.has(t.id)){ cls="tchip off"; why="auto-detected but turned off — click to turn back on"; }
+    else { cls="tchip"; why="click to search this topic"; }
     return '<button type="button" class="'+cls+'" data-topic="'+esc(t.id)+'" aria-pressed="'+(act.has(t.id))+
       '" title="'+esc(t.label+" — "+t.sub+" ("+why+")")+'">'+
-      '<span class="st" aria-hidden="true">'+st+'</span><span class="ico" aria-hidden="true">'+t.icon+
+      '<span class="ico" aria-hidden="true">'+t.icon+
       '</span><span class="lbl">'+esc(ivTitleCase(t.label))+'</span></button>';
   };
   document.getElementById("ivChips").innerHTML=CATS.map(c=>
@@ -887,7 +1057,7 @@ function renderInvestigate(){
   const d=D();
   buildIvChips();
   const {act}=ivActiveIds();
-  const terms=ivTerms(act);
+  const {all:terms, strong}=ivTerms(act);
   const nInv=document.getElementById("nInv");
   const explain=document.getElementById("ivExplain");
   const scopeEl=document.getElementById("ivScope");
@@ -917,7 +1087,20 @@ function renderInvestigate(){
     return;
   }
 
+  // only generic polarity words typed (no topic, no distinctive word) — refuse to flood the
+  // report with every "Block…" setting and instead ask for something to anchor on
+  if(!strong.size){
+    explain.innerHTML=
+      '<div class="iv-lead">That’s a bit too general to pin down.</div>'+
+      '<div class="small">Words like “blocked”, “disabled” or “off” match hundreds of unrelated settings on their own. Add <b>what</b> it affects — an app name, or a word like <b>USB</b>, <b>BitLocker</b>, <b>Copilot</b>, <b>Wi-Fi</b> — or pick a topic above.</div>';
+    susBox.innerHTML=""; hints.innerHTML=""; tblCard.style.display="none"; shCard.style.display="none"; nInv.style.display="none";
+    return;
+  }
+
   // ---- match settings rows (applying + unknown), shadow rows and policy metadata
+  // A row/policy qualifies only when it hits at least one STRONG term (topic synonym or a
+  // distinctive typed word); weak polarity words still highlight but never qualify alone.
+  const hasStrong=m=>m.some(t=>strong.has(t));
   const sus={};
   const susFor=p=>{ if(!sus[p.PolicyId]) sus[p.PolicyId]={p,rows:[],culprits:0,terms:new Set(),meta:false,shadow:[]}; return sus[p.PolicyId]; };
 
@@ -926,7 +1109,7 @@ function renderInvestigate(){
   baseSettings.forEach(s=>{
     const hay=(s.Setting+" "+s.Value+" "+s.Category).toLowerCase();
     const m=ivMatchTerms(hay,terms);
-    if(!m.length) return;
+    if(!hasStrong(m)) return;
     const p=POLBYID[s.PolicyId]; if(!p) return;
     const e=susFor(p);
     const culprit=isCulprit(s);
@@ -937,7 +1120,7 @@ function renderInvestigate(){
   baseShadow.forEach(s=>{
     const hay=(s.Setting+" "+s.Value+" "+s.Category).toLowerCase();
     const m=ivMatchTerms(hay,terms);
-    if(!m.length) return;
+    if(!hasStrong(m)) return;
     const p=POLBYID[s.PolicyId]; if(!p) return;
     const e=susFor(p);
     e.shadow.push({s,m,culprit:isCulprit(s)});
@@ -946,7 +1129,7 @@ function renderInvestigate(){
   basePolicies.forEach(p=>{
     const hay=(p.Name+" "+(p.Desc||"")+" "+(p.Detail||"")+" "+p.FamilyLabel+" "+(p.Intent||"")+" "+(p.Via||"")).toLowerCase();
     const m=ivMatchTerms(hay,terms);
-    if(m.length){ const e=susFor(p); e.meta=true; m.forEach(x=>e.terms.add(x)); }
+    if(hasStrong(m)){ const e=susFor(p); e.meta=true; m.forEach(x=>e.terms.add(x)); }
   });
 
   const applying=[],shadowSus=[];
@@ -1007,11 +1190,14 @@ function renderInvestigate(){
   document.querySelector("#tblIv tbody").innerHTML=rows.map((r,i)=>{
     const s=r.s;
     const isJson=/^[\[{]/.test(s.Value||"");
+    const isXml=isXmlValue(s.Value);
+    const dispVal=isXml?prettyXml(s.Value):(s.Value||"");
+    const xmlMulti=isXml&&/\n/.test(dispVal);
     const long=(s.Value||"").length>110;
-    const vinner=(isJson?'<span class="mono">':'')+hl(s.Value,terms)+(isJson?'</span>':'');
-    const v=(long||isJson)?'<div class="vwrap expandable" onclick="event.stopPropagation();this.classList.toggle(\'open\')">'+vinner+'</div>':vinner;
+    const vinner=(isJson||isXml?'<span class="mono">':'')+hl(dispVal,terms)+(isJson||isXml?'</span>':'');
+    const v=(long||isJson||xmlMulti)?'<div class="vwrap expandable" onclick="event.stopPropagation();this.classList.toggle(\'open\')">'+vinner+'</div>':vinner;
     return "<tr class='rowlink' data-ividx='"+i+"'><td>"+(r.culprit?'<span class="flag" title="value looks restrictive for this setting name (heuristic - verify)">⚑</span>':"")+"</td>"+
-      "<td>"+hl(s.Setting,terms)+"</td><td>"+v+"</td>"+
+      "<td class='stg'>"+wbrify(hl(s.Setting,terms))+"</td><td class='val'>"+v+"</td>"+
       "<td title='"+esc(s.Via||"")+"'>"+hl(s.PolicyName,terms)+"</td>"+
       "<td><span class='badge b-"+r.p.Status.toLowerCase()+"'>"+esc(r.p.Status)+"</span></td>"+
       "<td class='small'>"+esc(s.FamilyLabel)+(r.p.Intent?" · "+esc(r.p.Intent):"")+"</td>"+
@@ -1030,9 +1216,9 @@ function renderInvestigate(){
   if(shRows.length){
     shCard.innerHTML='<details><summary style="cursor:pointer;font-size:13px"><b>'+shadowSus.length+
       '</b> matching polic'+(shadowSus.length===1?"y is":"ies are")+' targeted here but <b>NOT applying</b> (excluded / filtered out) — ruled out as the cause on this target, but they explain differences elsewhere</summary>'+
-      '<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Policy</th><th>Why not applying</th><th>Setting</th><th>Value</th></tr></thead><tbody>'+
-      shRows.map((r,i)=>"<tr"+(r.s?" class='rowlink' data-shidx='"+i+"'":"")+"><td>"+esc(r.p.Name)+' <span class="badge b-'+r.p.Status.toLowerCase()+'">'+esc(r.p.Status)+"</span></td><td class='small'>"+esc(r.p.Via||"")+"</td><td>"+
-        (r.s?hl(r.s.Setting,terms):'<span class="small">(matched by name/description)</span>')+"</td><td>"+(r.s?hl(String(r.s.Value).slice(0,200),terms):"")+"</td></tr>").join("")+
+      '<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Policy</th><th>Why not applying</th><th class="stg">Setting</th><th class="val">Value</th></tr></thead><tbody>'+
+      shRows.map((r,i)=>"<tr"+(r.s?" class='rowlink' data-shidx='"+i+"'":"")+"><td>"+esc(r.p.Name)+' <span class="badge b-'+r.p.Status.toLowerCase()+'">'+esc(r.p.Status)+"</span></td><td class='small'>"+esc(r.p.Via||"")+"</td><td class='stg'>"+
+        (r.s?wbrify(hl(r.s.Setting,terms)):'<span class="small">(matched by name/description)</span>')+"</td><td class='val'>"+(r.s?hl(String(r.s.Value).slice(0,200),terms):"")+"</td></tr>").join("")+
       '</tbody></table></div></details>';
   }
 }
