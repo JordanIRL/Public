@@ -43,19 +43,6 @@ This gives you a reusable “M365 & Intune Reference” agent without connecting
 
 > There are a few enterprise-specific traps worth clearing before you create anything. I’m checking Microsoft’s current guidance on private sharing, data handling and Copilot Studio charging so I can separate genuine risks from harmless setup choices.
 >
-> <details><summary>Searched the web</summary>
->
-> <details><summary>Searched the web</summary>
->
-> - Searched the web for `site:learn.microsoft.com/en-us/microsoft-copilot-studio share agents private access unpublished environment security roles ...`
-> - Searched the web for `site:learn.microsoft.com/en-us/microsoft-copilot-studio "private" agent "publish" maker ...`
-> - Searched the web for `site:learn.microsoft.com/en-us/microsoft-365/copilot Agent Builder public website web search no charge Copilot Credits ...`
-> - Searched the web for `site:learn.microsoft.com/en-us/microsoft-copilot-studio public website Bing query DPA data privacy cross geo ...`
->
-> </details>
->
-> </details>
-</details>
 
 Yes — in an enterprise tenant, “private” means **only you can use it**, not that it is invisible to authorised IT, security or compliance administrators.
 
@@ -91,34 +78,3 @@ Before creating it, send this to your Copilot/Power Platform owner if that is no
 
 > I want a single-user Agent Builder agent limited to official Microsoft Learn public websites. It will have no work knowledge, uploads, connectors, actions, workflows, sharing or publishing. Please confirm public-web grounding is permitted, the applicable audit/retention policy, and that no pay-as-you-go billing applies.
 
-> I like this Copilot plan, can you give me a single markdown doc with a full plan
-
-<details><summary>4 previous messages</summary>
-
-> I’ll turn the agreed approach into a single, self-contained plan, including the privacy, visibility, cost and approval controls so it can be used as an internal proposal.
->
-> The workspace is empty, so I’m creating the plan as a standalone Markdown file at the repository root.
->
-> <details><summary>Created a file, edited a file</summary>
->
-> - Wrote `./M365-Intune-public-docs-agent-plan.md` (+250 -0)
-> - Wrote `./M365-Intune-public-docs-agent-plan.md` (+10 -4)
-> - Wrote `./M365-Intune-public-docs-agent-plan.md` (+1 -0)
->
-> </details>
->
-> The plan now includes the controlled build steps, approval wording, data rules, private-sharing checks, cost controls and a test/maintenance process. I’m doing a final consistency check before handing it over.
-</details>
-
-Created the full plan: [M365-Intune-public-docs-agent-plan.md](./M365-Intune-public-docs-agent-plan.md)
-
-It covers private access, data handling, costs, approval checks, configuration, copy-paste instructions, testing, maintenance and future expansion controls. Formatting checks passed.
-
-> .
-
-<details><summary>1 previous message</summary>
-
-> System error
->
-> You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Jul 10th, 2026 4:17 AM.
-</details>
