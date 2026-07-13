@@ -1,4 +1,7 @@
 ﻿<#
+.TITLE
+    Intune Lens — resultant settings for Intune-managed Windows devices.
+
 .SYNOPSIS
     Intune Lens — resultant settings (RSOP) for Intune-managed Windows devices.
     Answers: "What are ALL the settings that apply to this device / these devices?"
@@ -158,13 +161,43 @@
 .EXAMPLE
     ./Get-IntuneResultantSettings.ps1 -All -ScopeFilter "Corp Windows 11"
 
+.TAGS
+    Microsoft Intune, Microsoft Graph, RSOP, Windows, reporting, troubleshooting
+
+.PLATFORM
+    PowerShell 7 or later on Windows, macOS, or Linux.
+
+.PERMISSIONS
+    Delegated: DeviceManagementConfiguration.Read.All,
+    DeviceManagementManagedDevices.Read.All, Directory.Read.All,
+    DeviceManagementApps.Read.All, DeviceManagementScripts.Read.All.
+
+.AUTHOR
+    Jordan
+
+.VERSION
+    2.6.0
+
+.CHANGELOG
+    2.6.0 (2026-07-12) — redesigns the rich report around a clearer diagnostic shell,
+    compact grouped filters, responsive setting cards, reduced keyboard tab stops,
+    and an accessible modal detail drawer.
+    2.5.3 (2026-07-12) — correctly renders ADMX multi-text string collections while
+    preserving structured name/value presentation lists.
+    2.5.2 (2026-07-12) — isolates cache options, prevents decrypted OMA-URI values
+    from being cached, honours explicit Graph context selectors, and fixes paging limits.
+
+.LASTUPDATE
+    2026-07-12
+
 .NOTES
-    Version 2.5.1 (2026-07-05)
+    Version 2.6.0 (2026-07-12)
     Run with NO parameters for a guided interactive menu.
     Read-only: performs GET/report POST calls only; never modifies tenant data.
     Encrypted custom OMA-URI values are decrypted into the report - treat the export as sensitive.
     Keep report-template.html next to this script for the full-featured HTML report.
 #>
+#Requires -Version 7.0
 [CmdletBinding(DefaultParameterSetName = 'Interactive')]
 param(
     [Parameter(ParameterSetName = 'BySerial', Mandatory = $true, Position = 0)]
@@ -219,8 +252,10 @@ param(
 
 Set-StrictMode -Off
 $ErrorActionPreference = 'Stop'
-$script:Version = '2.5.1'
+$script:Version = '2.6.0'
+$script:TemplateSchema = 2
 $script:StartTime = Get-Date
+$script:ContainsDecryptedSecrets = $false
 
 #region ---------- console helpers ----------------------------------------------------------
 
@@ -269,15 +304,22 @@ function Connect-RsopGraph {
     $needConnect = $true
     if ($ctx -and $ctx.Scopes) {
         $missing = @($script:RequiredScopes | Where-Object { $ctx.Scopes -notcontains $_ })
-        if ($missing.Count -eq 0) {
+        $contextMatches =
+            (-not $TenantId -or [string]$ctx.TenantId -ieq $TenantId) -and
+            (-not $ClientId -or [string]$ctx.ClientId -ieq $ClientId) -and
+            ([string]$ctx.Environment -ieq $Environment)
+        if ($missing.Count -eq 0 -and $contextMatches) {
             $needConnect = $false
             Write-Info ("Reusing existing Graph session: {0} ({1})" -f $ctx.Account, $ctx.TenantId)
+        }
+        elseif (-not $contextMatches) {
+            Write-Info 'Existing Graph session does not match the requested tenant, client, or environment; reconnecting.'
         }
     }
 
     if ($needConnect) {
         Write-Step "Signing in to Microsoft Graph (read-only scopes)"
-        $cp = @{ Scopes = $script:RequiredScopes; Environment = $Environment; NoWelcome = $true }
+        $cp = @{ Scopes = $script:RequiredScopes; Environment = $Environment; NoWelcome = $true; ContextScope = 'Process' }
         if ($TenantId)      { $cp['TenantId'] = $TenantId }
         if ($ClientId)      { $cp['ClientId'] = $ClientId }
         if ($UseDeviceCode) { $cp['UseDeviceCode'] = $true }
@@ -755,7 +797,10 @@ function Convert-LegacyProperties {
                     # getOmaSettingPlainTextValue function (writes the secret into the report)
                     $secretRef = [string](Get-Prop $oma 'secretReferenceValueId')
                     $plain = Get-OmaPlainText -ConfigId $cfgId -SecretRefId $secretRef
-                    if ($null -ne $plain -and $plain -ne '') { $omaVal = $plain }
+                    if ($null -ne $plain -and $plain -ne '') {
+                        $omaVal = $plain
+                        $script:ContainsDecryptedSecrets = $true
+                    }
                     else { $omaVal = '(encrypted value - could not decrypt; view in portal)' }
                 }
                 [void]$rows.Add([pscustomobject]@{
@@ -810,13 +855,26 @@ function Convert-AdmxValues {
                 $pvId = [string](Get-Prop $pv 'id')
                 $val = $null
                 $vv = Get-Prop $pv 'value'
-                $vvs = Get-Prop $pv 'values'
+                $vvs = Get-PropList $pv 'values'
                 if ($null -ne $vv) { $val = Format-SettingValue $vv }
-                elseif ($null -ne $vvs) {
+                elseif ($vvs.Count -gt 0) {
                     $parts = @()
-                    foreach ($e in @($vvs)) {
-                        $en = Get-Prop $e 'name'; $ev = Get-Prop $e 'value'
-                        if ($null -ne $en -and "$en" -ne '') { $parts += ("{0}={1}" -f $en, $ev) } else { $parts += [string]$ev }
+                    foreach ($e in $vvs) {
+                        if ($null -eq $e) { continue }
+                        # Multi-text presentations return a String collection; list-style
+                        # presentations return objects with name/value fields.
+                        if ($e -is [string] -or $e -is [System.ValueType]) {
+                            $parts += (Format-SettingValue $e)
+                            continue
+                        }
+                        $en = Get-Prop $e 'name'
+                        $ev = Get-Prop $e 'value'
+                        if ($null -ne $en -and "$en" -ne '') {
+                            $parts += ("{0}={1}" -f $en, (Format-SettingValue $ev))
+                        }
+                        elseif ($null -ne $ev) {
+                            $parts += (Format-SettingValue $ev)
+                        }
                     }
                     $val = $parts -join '; '
                 }
@@ -955,14 +1013,45 @@ function Get-PolicyCorpus {
     param([string]$TenantKey)
 
     $cacheFile = Join-Path $HOME (".intune-rsop-cache-{0}.json" -f ($TenantKey -replace '[^a-zA-Z0-9\-]', ''))
+    $cacheOptions = [pscustomobject]@{
+        IncludeCompliance = [bool](-not $SkipCompliance)
+        IncludeUpdates    = [bool](-not $SkipUpdates)
+        IncludeScripts    = [bool](-not $SkipScripts)
+        IncludeApps       = [bool](-not $SkipApps)
+    }
+    # Version 5 and earlier may contain decrypted custom OMA-URI values. Remove those
+    # files on every run, even when cache reads are disabled with -Refresh/-CacheMinutes 0.
+    if (Test-Path $cacheFile) {
+        try {
+            $cacheHeader = Get-Content -Raw -Path $cacheFile | ConvertFrom-Json
+            $cacheHeaderVersion = 0; try { $cacheHeaderVersion = [int]$cacheHeader.cacheVersion } catch { }
+            if ($cacheHeaderVersion -lt 6) {
+                Remove-Item -LiteralPath $cacheFile -Force -ErrorAction Stop
+                Write-Warn2 'Removed a legacy policy cache that may contain decrypted OMA-URI values.'
+            }
+        }
+        catch {
+            Remove-Item -LiteralPath $cacheFile -Force -ErrorAction SilentlyContinue
+            Write-Warn2 'Removed an unreadable legacy policy cache.'
+        }
+    }
     if (-not $Refresh -and $CacheMinutes -gt 0 -and (Test-Path $cacheFile)) {
         try {
             $cached = Get-Content -Raw -Path $cacheFile | ConvertFrom-Json
             $age = (Get-Date) - [datetime]$cached.generated
             $ver = 0; try { $ver = [int]$cached.cacheVersion } catch { }
-            if ($ver -eq 5 -and $age.TotalMinutes -lt $CacheMinutes) {
+            $optionsMatch = $ver -eq 6 -and $null -ne $cached.cacheOptions -and
+                [bool]$cached.cacheOptions.IncludeCompliance -eq $cacheOptions.IncludeCompliance -and
+                [bool]$cached.cacheOptions.IncludeUpdates -eq $cacheOptions.IncludeUpdates -and
+                [bool]$cached.cacheOptions.IncludeScripts -eq $cacheOptions.IncludeScripts -and
+                [bool]$cached.cacheOptions.IncludeApps -eq $cacheOptions.IncludeApps
+            if ($optionsMatch -and $age.TotalMinutes -lt $CacheMinutes) {
                 Write-Step ("Using cached policy data from {0:HH:mm:ss} ({1:n0} min old; -Refresh to re-pull)" -f [datetime]$cached.generated, $age.TotalMinutes)
                 return $cached
+            }
+            if ($ver -lt 6) {
+                Remove-Item -LiteralPath $cacheFile -Force -ErrorAction SilentlyContinue
+                Write-Warn2 'Removed a legacy policy cache that may contain decrypted OMA-URI values.'
             }
         } catch { Write-Warn2 "Cache unreadable; re-pulling." }
     }
@@ -1372,7 +1461,8 @@ function Get-PolicyCorpus {
     } catch { [void]$warnings.Add("Could not list assignment filters: $($_.Exception.Message)") }
 
     $corpus = [pscustomobject]@{
-        cacheVersion = 5
+        cacheVersion = 6
+        cacheOptions = $cacheOptions
         generated    = (Get-Date).ToString('o')
         tenant       = $TenantKey
         policies     = $policies.ToArray()
@@ -1380,8 +1470,12 @@ function Get-PolicyCorpus {
         warnings     = $warnings.ToArray()
     }
 
-    if ($CacheMinutes -gt 0) {
+    if ($CacheMinutes -gt 0 -and -not $script:ContainsDecryptedSecrets) {
         try { $corpus | ConvertTo-Json -Depth 10 -Compress | Set-Content -Path $cacheFile -Encoding UTF8 } catch { }
+    }
+    elseif ($script:ContainsDecryptedSecrets) {
+        Remove-Item -LiteralPath $cacheFile -Force -ErrorAction SilentlyContinue
+        Write-Warn2 'Policy cache disabled for this run because decrypted OMA-URI values are present.'
     }
 
     $assignedCount = @($corpus.policies | Where-Object { @($_.Assignments).Count -gt 0 }).Count
@@ -1444,8 +1538,9 @@ function Get-EntraGroupIds {
         $resp = Invoke-Rsop -Method POST -Uri ("v1.0/{0}/{1}/getMemberGroups" -f $Kind, $DirectoryObjectId) -Body @{ securityEnabledOnly = $false }
         return @($resp['value'] | ForEach-Object { [string]$_ })
     } catch {
-        Write-Warn2 ("Could not read group membership for {0} {1}: {2}" -f $Kind, $DirectoryObjectId, $_.Exception.Message)
-        return @()
+        $message = "Could not read group membership for {0} {1}: {2}" -f $Kind, $DirectoryObjectId, $_.Exception.Message
+        Add-RunLog -Level error -Message $message
+        throw $message
     }
 }
 
@@ -1477,21 +1572,33 @@ function Get-DeviceContext {
     $md = $ManagedDevice
     $azId = [string](Get-Prop $md 'azureADDeviceId')
     $dirId = $null
+    $deviceGroupsResolved = $true
     if ($azId -and $azId -ne '00000000-0000-0000-0000-000000000000') {
         try {
             $resp = Invoke-Rsop -Uri ("v1.0/devices?`$filter=deviceId eq '{0}'&`$select=id" -f $azId)
             $vals = @($resp['value'])
             if ($vals.Count -gt 0) { $dirId = [string]$vals[0]['id'] }
-        } catch { }
+        } catch {
+            $deviceGroupsResolved = $false
+            Add-RunLog -Level error -Message ("Could not resolve the Entra device object for '{0}': {1}" -f (Get-Prop $md 'deviceName'), $_.Exception.Message)
+        }
     }
     $deviceGroups = @()
-    if ($dirId) { $deviceGroups = Get-EntraGroupIds -DirectoryObjectId $dirId -Kind 'devices' }
-    else { Write-Warn2 ("No Entra device object found for '{0}' - device-group targeting cannot be evaluated." -f (Get-Prop $md 'deviceName')) }
+    if ($dirId) {
+        try { $deviceGroups = Get-EntraGroupIds -DirectoryObjectId $dirId -Kind 'devices' }
+        catch { $deviceGroupsResolved = $false }
+    }
+    else {
+        $deviceGroupsResolved = $false
+        Add-RunLog -Level error -Message ("No Entra device object found for '{0}' - device-group targeting cannot be evaluated." -f (Get-Prop $md 'deviceName'))
+    }
 
     $userId = [string](Get-Prop $md 'userId')
     $userGroups = @()
+    $userGroupsResolved = $true
     if ($userId -and $userId -ne '00000000-0000-0000-0000-000000000000') {
-        $userGroups = Get-EntraGroupIds -DirectoryObjectId $userId -Kind 'users'
+        try { $userGroups = Get-EntraGroupIds -DirectoryObjectId $userId -Kind 'users' }
+        catch { $userGroupsResolved = $false }
     }
 
     $dg = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
@@ -1504,6 +1611,8 @@ function Get-DeviceContext {
         DirectoryId     = $dirId
         DeviceGroupIds  = $dg
         UserGroupIds    = $ug
+        DeviceGroupsResolved = $deviceGroupsResolved
+        UserGroupsResolved   = $userGroupsResolved
         HasPrimaryUser  = [bool]($userId -and $userId -ne '00000000-0000-0000-0000-000000000000')
     }
 }
@@ -1919,14 +2028,16 @@ function Test-DeviceMatchesFilter {
 function Get-FilterMatchedDevices {
     # Full evaluation of a filter -> managed devices (used for -AssignmentFilter mode).
     # Falls back to local rule evaluation across the device index when the service call fails.
-    param($FilterObj, [int]$Cap = 2000)
+    param($FilterObj, [int]$Cap = 0)
     $rows = New-Object System.Collections.Generic.List[object]
     $skip = 0
+    $truncated = $false
     try {
         while ($true) {
             $batch = @(Invoke-FilterEvaluate -FilterObj $FilterObj -Top 100 -Skip $skip)
             foreach ($b in $batch) { [void]$rows.Add($b) }
-            if ($batch.Count -lt 100 -or $rows.Count -ge $Cap) { break }
+            if ($batch.Count -lt 100) { break }
+            if ($Cap -gt 0 -and $rows.Count -ge $Cap) { $truncated = $true; break }
             $skip += 100
         }
     } catch {
@@ -1942,9 +2053,16 @@ function Get-FilterMatchedDevices {
         if ($undecided -gt 0) {
             Write-Warn2 ("Filter rule could not be evaluated locally for {0} devices; they are not included." -f $undecided)
         }
+        if ($Cap -gt 0 -and $matched.Count -gt $Cap) {
+            Write-Warn2 ("Filter results capped at {0} devices." -f $Cap)
+            return @($matched.ToArray() | Select-Object -First $Cap)
+        }
         return $matched.ToArray()
     }
-    if ($rows.Count -ge $Cap) { Write-Warn2 ("Filter preview capped at {0} devices." -f $Cap) }
+    if ($truncated) {
+        while ($rows.Count -gt $Cap) { $rows.RemoveAt($rows.Count - 1) }
+        Write-Warn2 ("Filter results capped at {0} devices." -f $Cap)
+    }
 
     # Map preview rows back to managed devices (by id column when present, else by name).
     $idx = Get-DeviceIndex
@@ -1997,6 +2115,18 @@ function Get-PolicyApplicability {
     $unknownNotes = New-Object System.Collections.Generic.List[string]
     $applies = $false
 
+    $hasGroupExclusions = @($Policy.Assignments | Where-Object { [string]$_.Type -like '*exclusionGroupAssignmentTarget*' }).Count -gt 0
+    if ($hasGroupExclusions -and
+        (-not $Ctx.DeviceGroupsResolved -or ($Ctx.HasPrimaryUser -and -not $Ctx.UserGroupsResolved))) {
+        $unresolved = @()
+        if (-not $Ctx.DeviceGroupsResolved) { $unresolved += 'device' }
+        if ($Ctx.HasPrimaryUser -and -not $Ctx.UserGroupsResolved) { $unresolved += 'primary user' }
+        return [pscustomobject]@{
+            Status  = 'Unknown'
+            Reasons = @(("Could not resolve {0} group membership; group-targeted applicability is unknown." -f ($unresolved -join ' and ')))
+        }
+    }
+
     $deviceExcl = New-Object System.Collections.Generic.List[string]
     $userExcl = New-Object System.Collections.Generic.List[string]
     foreach ($a in @($Policy.Assignments)) {
@@ -2024,6 +2154,9 @@ function Get-PolicyApplicability {
                 if ($a.GroupId) {
                     if ($Ctx.DeviceGroupIds.Contains($a.GroupId)) { $base = ("Device group '{0}'" -f (Get-GroupName $a.GroupId)); $kind = 'device' }
                     elseif ($Ctx.UserGroupIds.Contains($a.GroupId)) { $base = ("User group '{0}' (via primary user)" -f (Get-GroupName $a.GroupId)); $kind = 'user' }
+                    elseif (-not $Ctx.DeviceGroupsResolved -or ($Ctx.HasPrimaryUser -and -not $Ctx.UserGroupsResolved)) {
+                        [void]$unknownNotes.Add(("Could not determine membership of group '{0}' because directory membership resolution failed." -f (Get-GroupName $a.GroupId)))
+                    }
                 }
             }
         }
@@ -2159,7 +2292,11 @@ function Get-ReportedPolicyStatus {
             }
             $batch = @(ConvertFrom-ReportGrid -Response $resp)
             $rows += $batch
-            if ($batch.Count -lt 50 -or $skip -gt 1000) { break }
+            if ($batch.Count -lt 50) { break }
+            if ($skip -ge 9950) {
+                Add-RunLog -Level warn -Message 'Device-reported policy results exceeded 10,000 rows and were truncated.'
+                break
+            }
             $skip += 50
         }
         foreach ($r in @($rows)) {
@@ -2921,6 +3058,26 @@ init();
 
 function Export-HtmlReport {
     param($Results, [string]$Path, [string]$QueryLabel, [string]$Tenant, [string]$Account)
+
+    # Accept only a template with the expected schema marker and required placeholders.
+    # An incompatible adjacent file must not silently generate a broken rich report.
+    $templatePath = $script:HtmlTemplatePath
+    if (-not $templatePath) { $templatePath = Join-Path $PSScriptRoot 'report-template.html' }
+    $html = $script:HtmlTemplate
+    if (Test-Path $templatePath) {
+        $candidate = Get-Content -Raw -Path $templatePath
+        $schemaMarker = '<meta name="intune-lens-template-schema" content="{0}">' -f $script:TemplateSchema
+        if ($candidate.Contains($schemaMarker) -and $candidate.Contains('__DATA__') -and $candidate.Contains('__TITLE__')) {
+            $html = $candidate
+        }
+        else {
+            Add-RunLog -Level warn -Message ("report-template.html is incompatible with template schema {0}; using the basic built-in layout." -f $script:TemplateSchema)
+        }
+    }
+    else {
+        Add-RunLog -Level warn -Message 'report-template.html not found next to the script; using the basic built-in layout.'
+    }
+
     $payload = [pscustomobject]@{
         query     = $QueryLabel
         generated = (Get-Date).ToString('yyyy-MM-dd HH:mm')
@@ -2933,16 +3090,9 @@ function Export-HtmlReport {
     $json = $payload | ConvertTo-Json -Depth 12 -Compress
     $json = $json.Replace('</', '<\/')
 
-    # prefer the rich external template next to the script; fall back to the embedded one
-    $templatePath = $script:HtmlTemplatePath
-    if (-not $templatePath) { $templatePath = Join-Path $PSScriptRoot 'report-template.html' }
-    if (Test-Path $templatePath) { $html = Get-Content -Raw -Path $templatePath }
-    else {
-        Write-Warn2 "report-template.html not found next to the script - using basic built-in layout."
-        $html = $script:HtmlTemplate
-    }
     $html = $html.Replace('__DATA__', $json)
-    $html = $html.Replace('__TITLE__', ("Intune Lens - " + $QueryLabel))
+    $safeTitle = [System.Net.WebUtility]::HtmlEncode(("Intune Lens - " + $QueryLabel))
+    $html = $html.Replace('__TITLE__', $safeTitle)
     $html = $html.Replace('__QUERY__', [System.Net.WebUtility]::HtmlEncode($QueryLabel))
     $html = $html.Replace('__GENERATED__', (Get-Date).ToString('dd-MM-yyyy'))
     $html = $html.Replace('__ACCOUNT__', [System.Net.WebUtility]::HtmlEncode($(if ($Account) { $Account } else { 'unknown account' })))
@@ -2969,7 +3119,10 @@ function Resolve-GroupIdentity {
     $esc = [string]$Value -replace "'", "''"
     $resp = Invoke-Rsop -Uri ("v1.0/groups?`$filter=displayName eq '{0}'&`$select=id,displayName" -f $esc)
     $vals = @($resp['value'])
-    if ($vals.Count -gt 1) { Write-Warn2 ("Multiple groups named '{0}'; using the first." -f $Value) }
+    if ($vals.Count -gt 1) {
+        $matches = @($vals | ForEach-Object { "{0} ({1})" -f $_['displayName'], $_['id'] }) -join '; '
+        throw "Multiple groups are named '$Value'. Re-run with the required object id. Matches: $matches"
+    }
     if ($vals.Count -eq 0) { return $null }
     return [pscustomobject]@{ id = [string]$vals[0]['id']; displayName = [string]$vals[0]['displayName'] }
 }
@@ -3043,7 +3196,7 @@ function Resolve-QueryResults {
             }
             $label = "Filter: " + $flt.Name
             Write-Step ("Evaluating assignment filter '{0}' server-side" -f $flt.Name)
-            $targets = @(Get-FilterMatchedDevices -FilterObj $flt)
+            $targets = @(Get-FilterMatchedDevices -FilterObj $flt -Cap $MaxDevices)
             Write-Info ("{0} devices match the filter" -f $targets.Count)
             if ($MaxDevices -gt 0 -and $targets.Count -gt $MaxDevices) {
                 Write-Warn2 ("Evaluating the first {0} (use -MaxDevices 0 for all)." -f $MaxDevices)
