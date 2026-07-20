@@ -17,12 +17,6 @@
 .PARAMETER Tenant
     Microsoft Entra tenant ID or tenant domain. Defaults to "organizations".
 
-.PARAMETER ClientId
-    Public-client application ID used for delegated authentication. The default
-    uses the Microsoft Graph Command Line Tools application. A custom public
-    client must register both http://localhost and the Microsoft WAM broker
-    redirect URI documented by Microsoft.
-
 .PARAMETER Open
     Opens the saved workbook after generation.
 
@@ -34,8 +28,14 @@
 
 .NOTES
     Requirements: Windows, PowerShell 7, desktop Microsoft Excel, and the
-    Microsoft.Graph.Authentication module from PowerShell Gallery.
-    Requested delegated scopes are read-only Intune scopes.
+    Microsoft.Graph.Authentication module from PowerShell Gallery (auto-installed
+    for the current user if missing).
+
+    Delegated permissions (all read-only):
+      DeviceManagementManagedDevices.Read.All
+      DeviceManagementConfiguration.Read.All
+      DeviceManagementApps.Read.All
+      DeviceManagementServiceConfig.Read.All
 #>
 
 [CmdletBinding()]
@@ -46,10 +46,6 @@ param(
     [Parameter()]
     [ValidatePattern('^(organizations|common|consumers|[0-9a-fA-F-]{36}|[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,})$')]
     [string] $Tenant = 'organizations',
-
-    [Parameter()]
-    [ValidatePattern('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')]
-    [string] $ClientId = '14d82eec-204b-4c2f-b7e8-296a70dab67e',
 
     [Parameter()]
     [switch] $Open,
@@ -70,7 +66,6 @@ $script:Scopes = @(
     'DeviceManagementApps.Read.All'
     'DeviceManagementServiceConfig.Read.All'
 )
-$script:ClientId = $ClientId
 $script:Tenant = $Tenant
 $script:GraphConnected = $false
 $script:UserLabel = 'unknown'
@@ -185,7 +180,7 @@ function Protect-ExcelText {
     return "'$Value"
 }
 
-function Normalize-Name {
+function ConvertTo-NormalizedName {
     param([AllowNull()][string] $Value)
     if ([string]::IsNullOrWhiteSpace($Value)) { return '' }
     return [regex]::Replace($Value.ToLowerInvariant(), '[^a-z0-9]', '')
@@ -312,12 +307,42 @@ function Test-TrustedGraphUri {
         ($parsed.IsDefaultPort -or $parsed.Port -eq 443)
 }
 
-function Assert-GraphAuthenticationModule {
-    $minimumVersion = [version]'2.35.1'
-    $module = Get-Module -ListAvailable -Name 'Microsoft.Graph.Authentication' |
-        Where-Object Version -GE $minimumVersion |
+function Get-GraphAuthenticationModule {
+    param([Parameter(Mandatory)][version] $MinimumVersion)
+    return Get-Module -ListAvailable -Name 'Microsoft.Graph.Authentication' |
+        Where-Object Version -GE $MinimumVersion |
         Sort-Object Version -Descending |
         Select-Object -First 1
+}
+
+function Assert-GraphAuthenticationModule {
+    $minimumVersion = [version]'2.35.1'
+    $module = Get-GraphAuthenticationModule -MinimumVersion $minimumVersion
+
+    # When the module is completely absent, install it from the PowerShell Gallery
+    # for the current user so the script is zero-setup. An outdated build is left
+    # untouched (updating shared modules can affect other tooling); the caller is
+    # asked to update it instead, below.
+    if ($null -eq $module -and
+        $null -eq (Get-Module -ListAvailable -Name 'Microsoft.Graph.Authentication')) {
+        Write-ReportStatus 'Microsoft.Graph.Authentication is not installed; installing it from the PowerShell Gallery for the current user...'
+        try {
+            if ($null -eq (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+                Install-PackageProvider -Name NuGet -Scope CurrentUser -Force -ErrorAction Stop | Out-Null
+            }
+            Install-Module -Name 'Microsoft.Graph.Authentication' -Scope CurrentUser `
+                -MinimumVersion $minimumVersion -Repository PSGallery -Force -AllowClobber -ErrorAction Stop
+            $module = Get-GraphAuthenticationModule -MinimumVersion $minimumVersion
+        }
+        catch {
+            throw @"
+Microsoft.Graph.Authentication $minimumVersion or newer is required for WAM sign-in, and automatic installation failed ($($_.Exception.Message)). Install the official Microsoft module manually, then run this script again:
+
+  Install-Module Microsoft.Graph.Authentication -Scope CurrentUser -Repository PSGallery
+"@
+        }
+    }
+
     if ($null -eq $module) {
         throw @"
 Microsoft.Graph.Authentication $minimumVersion or newer is required for WAM sign-in. Install or update the official Microsoft module, then run this script again:
@@ -327,7 +352,7 @@ Microsoft.Graph.Authentication $minimumVersion or newer is required for WAM sign
     }
 
     Import-Module $module.Path -ErrorAction Stop
-    foreach ($commandName in @('Connect-MgGraph','Disconnect-MgGraph','Get-MgContext','Invoke-MgGraphRequest','Set-MgGraphOption')) {
+    foreach ($commandName in @('Connect-MgGraph','Disconnect-MgGraph','Get-MgContext','Invoke-MgGraphRequest')) {
         if ($null -eq (Get-Command $commandName -ErrorAction SilentlyContinue)) {
             throw "The installed Microsoft.Graph.Authentication module does not provide $commandName. Update the module and try again."
         }
@@ -338,20 +363,6 @@ Microsoft.Graph.Authentication $minimumVersion or newer is required for WAM sign
         if (-not $requestCommand.Parameters.ContainsKey($parameterName)) {
             throw "The installed Microsoft.Graph.Authentication module is too old: Invoke-MgGraphRequest lacks -$parameterName. Update the module and try again."
         }
-    }
-}
-
-function Set-GraphWamEnabled {
-    param([Parameter(Mandatory)][bool] $Enabled)
-    $optionCommand = Get-Command 'Set-MgGraphOption' -ErrorAction Stop
-    if ($optionCommand.Parameters.ContainsKey('DisableLoginByWAM')) {
-        Microsoft.Graph.Authentication\Set-MgGraphOption -DisableLoginByWAM (-not $Enabled) -ErrorAction Stop | Out-Null
-    }
-    elseif ($optionCommand.Parameters.ContainsKey('EnableLoginByWAM')) {
-        Microsoft.Graph.Authentication\Set-MgGraphOption -EnableLoginByWAM $Enabled -ErrorAction Stop | Out-Null
-    }
-    else {
-        throw 'Set-MgGraphOption does not expose a WAM setting.'
     }
 }
 
@@ -389,23 +400,22 @@ function Connect-IntuneGraph {
     # window handle, so device code is the reliable fallback for embedded terminals.
     $methods = [Collections.Generic.List[hashtable]]::new()
     if (Test-ConsoleWindowAvailable) {
-        $methods.Add(@{ Name = 'WAM'; Wam = $true; DeviceCode = $false; Timeout = 120
+        $methods.Add(@{ Name = 'WAM'; DeviceCode = $false; Timeout = 120
             Status = 'Opening the Windows account picker (WAM)...' })
     }
     else {
         Write-ReportStatus 'This terminal exposes no console window handle, so WAM cannot open its account picker here; using device-code sign-in instead.'
     }
-    $methods.Add(@{ Name = 'device code'; Wam = $false; DeviceCode = $true; Timeout = 900
+    $methods.Add(@{ Name = 'device code'; DeviceCode = $true; Timeout = 900
         Status = 'Starting device-code sign-in - open the URL shown below and enter the code to continue...' })
 
     $connected = $false
     $lastError = $null
     foreach ($method in $methods) {
-        try { Set-GraphWamEnabled -Enabled $method.Wam }
-        catch { $lastError = $_; continue }
-
+        # No ClientId is supplied, so Connect-MgGraph uses its built-in Microsoft Graph
+        # Command Line Tools application, which is already registered with the redirect
+        # URIs that both WAM and device-code sign-in require.
         $connectParams = @{
-            ClientId      = $script:ClientId
             TenantId      = $script:Tenant
             Scopes        = $script:Scopes
             ContextScope  = 'Process'
@@ -738,7 +748,7 @@ function Invoke-GraphBatchGet {
 
 function New-ReportData {
     param(
-        [Parameter(Mandatory)][string[]] $Headers,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]] $Headers,
         [Parameter(Mandatory)][AllowEmptyCollection()][object[]] $Rows
     )
     if ($Rows.Count -gt $script:MaximumDataRows) {
@@ -1264,9 +1274,9 @@ function Test-ManagedDeviceDeletion {
 }
 
 function Get-DeletedResourceName {
-    param([Parameter(Mandatory)][object] $Event)
+    param([Parameter(Mandatory)][object] $AuditEvent)
     $firstName = ''
-    foreach ($resource in @(Get-ObjectValue $Event 'resources')) {
+    foreach ($resource in @(Get-ObjectValue $AuditEvent 'resources')) {
         $name = Get-ObjectString $resource 'displayName'
         if ([string]::IsNullOrWhiteSpace($firstName)) { $firstName = $name }
         $type = ((Get-ObjectString $resource 'type') + (Get-ObjectString $resource 'auditResourceType')).ToLowerInvariant()
@@ -1277,31 +1287,45 @@ function Get-DeletedResourceName {
 
 function Get-DeletedDevicesData {
     $cutoff = [datetime]::UtcNow.AddDays(-14).ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
-    $filter = [uri]::EscapeDataString("activityDateTime gt $cutoff")
-    $events = @(Invoke-GraphPaged -Uri "$($script:GraphBase)/deviceManagement/auditEvents?`$filter=$filter" -StatusLabel 'Fetching deleted-device audit events')
+    # Restrict the query server-side: device removals are recorded with
+    # activityOperationType 'Delete', and only the fields below are consumed. This
+    # avoids transferring every audit event in the window on busy tenants. If the
+    # tenant rejects the richer query, fall back to the unfiltered date-only form.
+    $select = 'activityDateTime,activityOperationType,category,activityType,displayName,activity,activityResult,actor,resources'
+    $baseFilter = "activityDateTime gt $cutoff"
+    $deleteFilter = [uri]::EscapeDataString("$baseFilter and activityOperationType eq 'Delete'")
+    $auditUri = "$($script:GraphBase)/deviceManagement/auditEvents"
+    try {
+        $events = @(Invoke-GraphPaged -Uri "$auditUri`?`$filter=$deleteFilter&`$select=$select" -StatusLabel 'Fetching deleted-device audit events')
+    }
+    catch {
+        if (-not (Test-QueryFallbackAllowed $_)) { throw }
+        $dateFilter = [uri]::EscapeDataString($baseFilter)
+        $events = @(Invoke-GraphPaged -Uri "$auditUri`?`$filter=$dateFilter" -StatusLabel 'Fetching deleted-device audit events (compatibility query)')
+    }
     $rows = [Collections.Generic.List[object]]::new()
-    foreach ($event in $events) {
+    foreach ($auditEvent in $events) {
         if (-not (Test-ManagedDeviceDeletion `
-                -OperationType (Get-ObjectString $event 'activityOperationType') `
-                -Category (Get-ObjectString $event 'category') `
-                -ActivityType (Get-ObjectString $event 'activityType') `
-                -DisplayName (Get-ObjectString $event 'displayName'))) { continue }
-        $actor = Get-ObjectValue $event 'actor'
+                -OperationType (Get-ObjectString $auditEvent 'activityOperationType') `
+                -Category (Get-ObjectString $auditEvent 'category') `
+                -ActivityType (Get-ObjectString $auditEvent 'activityType') `
+                -DisplayName (Get-ObjectString $auditEvent 'displayName'))) { continue }
+        $actor = Get-ObjectValue $auditEvent 'actor'
         $deletedBy = Get-ObjectString $actor 'userPrincipalName'
         if ([string]::IsNullOrWhiteSpace($deletedBy)) { $deletedBy = Get-ObjectString $actor 'applicationDisplayName' }
         if ([string]::IsNullOrWhiteSpace($deletedBy)) { $deletedBy = Get-ObjectString $actor 'servicePrincipalName' }
         $actorType = Get-ObjectString $actor 'auditActorType'
         if ([string]::IsNullOrWhiteSpace($actorType)) { $actorType = Get-ObjectString $actor 'type' }
-        $activity = Get-ObjectString $event 'activityType'
-        if ([string]::IsNullOrWhiteSpace($activity)) { $activity = Get-ObjectString $event 'displayName' }
-        if ([string]::IsNullOrWhiteSpace($activity)) { $activity = Get-ObjectString $event 'activity' }
+        $activity = Get-ObjectString $auditEvent 'activityType'
+        if ([string]::IsNullOrWhiteSpace($activity)) { $activity = Get-ObjectString $auditEvent 'displayName' }
+        if ([string]::IsNullOrWhiteSpace($activity)) { $activity = Get-ObjectString $auditEvent 'activity' }
         $rows.Add([object]@(
-            ConvertFrom-GraphDate (Get-ObjectValue $event 'activityDateTime')
-            Get-DeletedResourceName $event
+            ConvertFrom-GraphDate (Get-ObjectValue $auditEvent 'activityDateTime')
+            Get-DeletedResourceName $auditEvent
             $deletedBy
             $actorType
             $activity
-            Get-ObjectString $event 'activityResult'
+            Get-ObjectString $auditEvent 'activityResult'
         ))
     }
     $sorted = @($rows.ToArray() | Sort-Object { if ($_[0] -is [datetime]) { $_[0] } else { [datetime]::MinValue } } -Descending)
@@ -1454,9 +1478,9 @@ function Get-ConnectorsData {
 
 function Find-HeaderIndex {
     param([Parameter(Mandatory)][string[]] $Headers, [Parameter(Mandatory)][string] $Wanted)
-    $wantedKey = Normalize-Name $Wanted
+    $wantedKey = ConvertTo-NormalizedName $Wanted
     for ($index = 0; $index -lt $Headers.Count; $index++) {
-        if ((Normalize-Name $Headers[$index]) -eq $wantedKey) { return $index }
+        if ((ConvertTo-NormalizedName $Headers[$index]) -eq $wantedKey) { return $index }
     }
     return -1
 }
@@ -1496,7 +1520,7 @@ function Get-AutopatchSummary {
     }
 }
 
-function Normalize-AppleModel {
+function ConvertTo-NormalizedAppleModel {
     param([AllowNull()][string] $Value)
     $text = ([string]$Value).Trim().ToLowerInvariant()
     if ($text.StartsWith('apple ')) { $text = $text.Substring(6) }
@@ -1547,7 +1571,7 @@ function Get-IosUpdateSummary {
             if ($posted -is [datetime] -and $posted -gt $now) { continue }
             if ($expires -is [datetime] -and $expires -lt $now) { continue }
             foreach ($supportedDevice in @(Get-ObjectValue $update 'supportedDevices')) {
-                $key = Normalize-AppleModel ([string]$supportedDevice)
+                $key = ConvertTo-NormalizedAppleModel ([string]$supportedDevice)
                 if ([string]::IsNullOrWhiteSpace($key)) { continue }
                 if (-not $latestByModel.ContainsKey($key) -or (Compare-DottedVersion $version $latestByModel[$key]) -gt 0) {
                     $latestByModel[$key] = $version
@@ -1559,7 +1583,7 @@ function Get-IosUpdateSummary {
         $hardwareById = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
         $requests = [ordered]@{}
         foreach ($device in $iosDevices) {
-            $modelKey = Normalize-AppleModel (Get-ObjectString $device 'model')
+            $modelKey = ConvertTo-NormalizedAppleModel (Get-ObjectString $device 'model')
             if (-not [string]::IsNullOrWhiteSpace($modelKey) -and $latestByModel.ContainsKey($modelKey)) { continue }
             $embedded = Get-EmbeddedIosProductName $device
             if (-not [string]::IsNullOrWhiteSpace($embedded)) { continue }
@@ -1581,7 +1605,7 @@ function Get-IosUpdateSummary {
         $eligible = 0
         foreach ($device in $iosDevices) {
             $availableVersion = ''
-            $modelKey = Normalize-AppleModel (Get-ObjectString $device 'model')
+            $modelKey = ConvertTo-NormalizedAppleModel (Get-ObjectString $device 'model')
             if (-not [string]::IsNullOrWhiteSpace($modelKey) -and $latestByModel.ContainsKey($modelKey)) {
                 $availableVersion = $latestByModel[$modelKey]
             }
@@ -1591,7 +1615,7 @@ function Get-IosUpdateSummary {
                     $id = (Get-ObjectString $device 'id').Trim()
                     if ($hardwareById.ContainsKey($id)) { $productName = $hardwareById[$id] }
                 }
-                $productKey = Normalize-AppleModel $productName
+                $productKey = ConvertTo-NormalizedAppleModel $productName
                 if (-not [string]::IsNullOrWhiteSpace($productKey) -and $latestByModel.ContainsKey($productKey)) {
                     $availableVersion = $latestByModel[$productKey]
                 }
@@ -1680,7 +1704,7 @@ function Set-CommonColumnFormatting {
     $greyFill = ConvertTo-OleColor 235 238 242
     for ($index = 1; $index -le $Table.ListColumns.Count; $index++) {
         $column = $Table.ListColumns.Item($index)
-        $name = Normalize-Name ([string]$column.Name)
+        $name = ConvertTo-NormalizedName ([string]$column.Name)
         $range = $column.DataBodyRange
         if ($null -eq $range) { continue }
 
@@ -1767,7 +1791,21 @@ function Write-DataSheet {
     $worksheet.Cells.Font.Name = 'Segoe UI'
     $worksheet.Cells.Font.Size = 10
 
-    $headers = @($Report.Headers | ForEach-Object { ConvertTo-PrettyHeader ([string]$_) })
+    $rawHeaders = @($Report.Headers)
+    $headers = @(
+        for ($headerIndex = 0; $headerIndex -lt $rawHeaders.Count; $headerIndex++) {
+            $rawHeader = [string]$rawHeaders[$headerIndex]
+            if ([string]::IsNullOrWhiteSpace($rawHeader)) {
+                # A live report schema can occasionally return a blank column name.
+                # Excel tables reject blank (and duplicate) headers, so substitute a
+                # stable placeholder rather than aborting the whole workbook.
+                "Column $($headerIndex + 1)"
+            }
+            else {
+                ConvertTo-PrettyHeader $rawHeader
+            }
+        }
+    )
     $rowCount = @($Report.Rows).Count
     $columnCount = $headers.Count
     if ($columnCount -le 0) { throw "$SheetName has no columns." }
@@ -1861,15 +1899,15 @@ function Find-DashboardHeaderIndex {
         [Parameter(Mandatory)][string[]] $Candidates
     )
     foreach ($candidate in $Candidates) {
-        $wanted = Normalize-Name $candidate
+        $wanted = ConvertTo-NormalizedName $candidate
         for ($index = 0; $index -lt $Headers.Count; $index++) {
-            if ((Normalize-Name $Headers[$index]) -eq $wanted) { return $index }
+            if ((ConvertTo-NormalizedName $Headers[$index]) -eq $wanted) { return $index }
         }
     }
     foreach ($candidate in $Candidates) {
-        $wanted = Normalize-Name $candidate
+        $wanted = ConvertTo-NormalizedName $candidate
         for ($index = 0; $index -lt $Headers.Count; $index++) {
-            if ((Normalize-Name $Headers[$index]).Contains($wanted, [StringComparison]::OrdinalIgnoreCase)) {
+            if ((ConvertTo-NormalizedName $Headers[$index]).Contains($wanted, [StringComparison]::OrdinalIgnoreCase)) {
                 return $index
             }
         }
@@ -2479,7 +2517,7 @@ function Assert-ReportRuntime {
     }
 }
 
-function Release-ComReference {
+function Remove-ComReference {
     param([AllowNull()][object] $InputObject)
     if ($null -eq $InputObject) { return }
     try {
@@ -2539,7 +2577,7 @@ function Invoke-IntuneExcelReport {
             }
             $dashboard = $workbook.Worksheets.Item(1)
             $dashboard.Name = 'Dashboard'
-            Release-ComReference $dashboard
+            Remove-ComReference $dashboard
             $dashboard = $null
 
             Write-DataSheet -Excel $excel -Workbook $workbook -SheetName 'Devices' `
@@ -2572,12 +2610,12 @@ function Invoke-IntuneExcelReport {
         finally {
             if ($null -ne $workbook) {
                 try { $workbook.Close($false) | Out-Null } catch { }
-                Release-ComReference $workbook
+                Remove-ComReference $workbook
                 $workbook = $null
             }
             if ($null -ne $excel) {
                 try { $excel.Quit() | Out-Null } catch { }
-                Release-ComReference $excel
+                Remove-ComReference $excel
                 $excel = $null
             }
             [GC]::Collect()
@@ -2595,11 +2633,11 @@ function Invoke-IntuneExcelReport {
     finally {
         if ($null -ne $workbook) {
             try { $workbook.Close($false) | Out-Null } catch { }
-            Release-ComReference $workbook
+            Remove-ComReference $workbook
         }
         if ($null -ne $excel) {
             try { $excel.Quit() | Out-Null } catch { }
-            Release-ComReference $excel
+            Remove-ComReference $excel
         }
         if (Test-Path -LiteralPath $temporaryOutputPath -PathType Leaf) {
             try { Remove-Item -LiteralPath $temporaryOutputPath -Force -ErrorAction Stop } catch { }
