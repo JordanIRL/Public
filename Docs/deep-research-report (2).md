@@ -2,450 +2,390 @@
 
 ## Executive summary
 
-The migration is feasible, but the **6,000-task plan cannot be converted intact into a single Planner Premium plan**. Microsoft’s current Basic Planner limit is 9,000 total tasks but only 3,000 active tasks, whereas a Premium plan has a **3,000-total-task ceiling**. Consequently, at least **3,001 of the present 6,000 tasks must be excluded from the Premium plan**. I recommend a production target of **no more than 2,700 tasks**, requiring removal, archival, consolidation or separation of at least **3,300 tasks** and leaving 10% headroom for new work during and immediately after cutover. citeturn14search0turn14search3turn16search0
+The migration is feasible, but the current **6,000-task Basic plan cannot be converted intact into one Premium plan**. Microsoft currently documents a Basic limit of 9,000 total tasks and 3,000 active tasks, while Premium has a **3,000 total-task limit**.
 
-The safest approach is **not** to treat “mark completed” as task reduction. Completion helps with Basic Planner's 3,000-*active*-task limit, but completed tasks still count against Premium's 3,000-*total*-task limit. Historical completed work should instead be exported to a governed repository, obsolete/duplicate items deleted after approval, repetitive low-value tasks consolidated where appropriate, and genuinely still-active work that does not belong in the Premium project separated into another plan. citeturn14search0turn14search3
+Do not target 2,999 tasks. Use **2,700 tasks or fewer as the cutover target**, leaving roughly 10% headroom. From 6,000 tasks, this means archiving, deleting, consolidating or moving at least **3,300 tasks**.
 
-Microsoft's conversion process is materially more than a licence upgrade. Conversion creates the Premium plan and, on a successful conversion, makes the old Basic plan read-only and archives it for **90 days**. The organisation can downgrade during that period, but downgrade restores the Basic plan to its exact pre-conversion state: **changes subsequently made in Premium are not automatically copied back**. If Microsoft detects incompatible source data, conversion can instead fall back to an import-type process that leaves the Basic plan unchanged and creates a Premium copy containing compatible data. citeturn14search2turn14search4
+Marking tasks complete does **not** solve the Premium limit: completed tasks still count toward Premium's 3,000 total-task ceiling.
 
-There is also an architectural break. Microsoft explicitly states that applications and workflows written for Basic Planner must be modified for Premium; moreover, the Microsoft Graph Planner API supports **Basic plans only**, not Premium plans or tasks. Any Power Automate flow, bespoke Graph script or third-party product built around Basic Planner must therefore be inventoried before conversion and either retired or redesigned, normally around Premium's Dataverse/Project Schedule APIs. citeturn16search0turn15search1turn20search0
+The highest migration risk is not the conversion itself. It is the surrounding operating model. Microsoft explicitly states that applications and workflows built for Basic Planner require modification for Premium. The Microsoft Graph Planner API supports Basic plans, not Premium plans/tasks, so Graph scripts, Power Automate flows and third-party integrations must be inventoried and tested before cutover.
 
-The most consequential governance issue is easy to miss. Microsoft’s current Planner compliance documentation states that Purview **eDiscovery and history are supported for group-contained Basic plans but not Premium plans**, while integrated audit logs span plan types; it also states that Planner retention policy is not currently supported. Premium plan data is stored in Dataverse, while Planner file attachments reside in SharePoint. For any organisation with legal hold, regulated-record or investigation requirements, compliance approval should therefore be a **hard migration gate**, not a post-migration task. citeturn15search0
+Premium is also not simply Basic plus extra features. Microsoft currently lists some capabilities as Basic-only, including Schedule view, Outlook calendar integration, SharePoint Planner web-part/full-page integration, recurring tasks, adding plans to Loop, and some mobile experiences. These must be checked against how the team works today.
 
-For the 80 users, purchasing 80 Premium licences is **not inherently necessary**. Users with qualifying Planner-in-Microsoft-365 entitlement can perform basic editing in a shared Premium plan; a paid Planner licence is needed for advanced Premium capabilities. Microsoft currently prices Planner Plan 1 at **£7.70 per user/month** and Planner and Project Plan 3 at **£23.10 per user/month**, paid yearly and excluding VAT. At current UK list price, licensing all 80 would therefore be approximately **£7,392/year ex VAT for Plan 1** or **£22,176/year ex VAT for Plan 3**. A role-based model is usually substantially cheaper. citeturn16search2turn17search0
+**Recommended decision:** proceed only after a controlled discovery and pilot. Migrate approximately 2,500-2,700 current tasks, preserve required history separately, rebuild or replace integrations before cutover, license Premium features by role rather than automatically licensing all 80 users, and use Microsoft's downgrade capability as a contingency rather than treating it as a conventional backup.
 
-**Recommended decision:** migrate a curated operational dataset of approximately 2,500–2,700 tasks; preserve the historical record separately; licence only users who require Premium features; rebuild integrations before cutover; use a representative pilot; and keep the 90-day Microsoft downgrade window as a contingency rather than treating it as a conventional backup.
+---
 
-The following details remain **unknown and must be resolved during discovery**: tenant type and cloud; current Microsoft 365 SKUs; whether the plan is shared with a Microsoft 365 group; exact active/completed-task counts; task-age profile; guests; legal holds and retention schedules; Power Automate flows; Graph/app registrations; Teams tabs and deep links; SharePoint Planner web parts; Loop task lists; Outlook calendar usage; recurring tasks; Power BI/Dataverse reporting; third-party integrations; attachment locations and permissions; required mobile functionality; Premium licence count; and the required cutover date. Conversion is specifically not available to GCC customers under Microsoft's current conversion documentation, making tenant type an immediate eligibility check. citeturn14search2
+## Confirmed Microsoft limits relevant to this migration
 
-## Current constraints, product changes and licensing
-
-### Limits that matter to this migration
-
-| Area | Basic Planner | Premium Planner | Migration implication |
+| Area | Basic | Premium | Migration impact |
 |---|---:|---:|---|
-| Total tasks per plan | 9,000 | **3,000** | 6,000 cannot fit in one Premium plan. citeturn14search0turn14search3 |
-| Active tasks | 3,000 | Premium limit is expressed as 3,000 **total** tasks | Completing tasks alone cannot solve the conversion constraint. citeturn14search0turn14search3 |
-| Buckets | 200 | No corresponding bucket limit is stated on Microsoft's current Premium limits page | Audit 200-bucket Basic ceiling; do not infer an undocumented Premium limit. citeturn14search0turn14search3 |
-| Assignees/resources per task | 20 | 20 | Existing tasks with ≤20 assignees fit this dimension. citeturn14search0turn14search3 |
-| Total Premium resources | n/a as a directly equivalent Basic limit | 300 | An 80-person team is comfortably inside the published Premium resource ceiling, subject to any additional resources/guests. citeturn14search3 |
-| Basic checklist items | 20/task | — | Consolidating microtasks into Basic checklists is possible up to 20 items/task, but sacrifices independent task metadata. citeturn14search0 |
-| Premium task links | — | 2,000/project; 20 predecessor+successor links/task | Relevant when dependencies are introduced after migration. citeturn14search3 |
-| Premium custom fields | — | 10/project | Design custom metadata deliberately rather than recreating arbitrary source fields. citeturn14search3 |
-| Premium goals | — | 10/project | Confirm whether business structure needs more than ten top-level goals. citeturn14search3 |
-| Premium hierarchy | — | 10 levels | More than adequate for most work breakdown structures, but worth checking imported hierarchies. citeturn14search3 |
-| Premium project duration | — | 3,650 days | Long-running programme plans need review. citeturn14search3 |
+| Total tasks per plan | 9,000 | **3,000** | 6,000 tasks cannot fit in one Premium plan |
+| Active tasks | 3,000 | Limit is based on total tasks | Completing old tasks is insufficient |
+| Basic buckets | 200 | Check current Premium design requirements | Review current bucket structure |
+| Assignees per task | 20 | 20 | Existing heavily assigned tasks should be checked |
+| Premium resources | n/a | 300 per project | 80-person team is within the published limit |
+| Basic checklist items | 20 per task | Different Premium task model available | Useful only for genuine microtasks |
+| Premium custom fields | n/a | 10 per project | Design metadata deliberately |
+| Premium goals | n/a | 10 per project | Confirm business requirements |
+| Premium hierarchy | n/a | 10 levels | Check any planned work breakdown structure |
 
-Microsoft's dedicated Premium limits documentation, updated July 2025, gives **300 total resources per project**. Some older Microsoft service-description material has historically shown a lower number, so the dedicated limits page should be treated as the current published engineering limit and rechecked immediately before production cutover because Microsoft also reserves the right to change Planner limits. citeturn14search0turn14search3
+Microsoft notes that Planner limits can change, so recheck the official limits immediately before production cutover.
 
-### Basic and Premium are not a simple superset relationship
+---
 
-Premium gives the capabilities most organisations migrate for: Timeline/Gantt, People view, dependencies, milestones, custom fields, conditional colouring, critical path, coloured buckets, backlog/sprints, goals, custom calendars and task history, although actual access to some features depends on the user's paid subscription. citeturn16search0turn17search0
+## Ireland licensing position
 
-However, Microsoft's current comparison still lists several **Basic-only** capabilities: Schedule view, Planner-to-Outlook calendar, the SharePoint Planner web part/full-page integration, Teams Mobile Tasks support, recurring tasks and adding plans to Loop. Premium task conversations are supported, but Microsoft says the Premium plan must be added to a Teams channel for conversations. These gaps must be treated as migration requirements rather than assumed to “come along” automatically. citeturn16search0
+Microsoft's Ireland list pricing currently shows:
 
-Recurring tasks are particularly important. Current Basic Planner can generate the next recurrence when the prior occurrence is completed, whereas Microsoft's downgrade guidance explicitly identifies recurring-task dependency as a reason a team might need to remain on Basic. Inventory recurring tasks before migration and decide whether to redesign their recurrence through automation, retain them in a Basic feeder plan, or replace them with another approved operating procedure. citeturn21search5turn14search4
+| Licence | Ireland list price | Typical use |
+|---|---:|---|
+| Planner in qualifying Microsoft 365 | Included | Basic Planner and basic editing in shared Premium plans |
+| Planner Plan 1 | **€8.70/user/month**, paid yearly, ex VAT | Timeline, dependencies, goals, People view, backlogs/sprints and other Premium planning features |
+| Planner and Project Plan 3 | **€26.00/user/month**, paid yearly, ex VAT | Higher-end project capabilities including task history and advanced project-management functionality |
 
-### Recent changes that alter implementation assumptions
+Illustrative annual list cost, excluding VAT:
 
-Microsoft has changed Planner substantially over the last eighteen months. The migration design should use the **current Planner experience**, not older Project-for-the-web assumptions.
-
-| Change | Why it matters |
-|---|---|
-| **June 2025 – bulk editing for Basic plans.** Microsoft added multi-task updating in Grid view, making pre-migration triage of fields such as status, priority and assignments materially easier. It should be used for classification, but should not be mistaken for a documented mass-delete facility. citeturn19search0 |
-| **August 2025 – transition to unified Planner.** Microsoft transitioned users away from the separate Project-for-the-web experience towards the unified Planner experience. Some older conversion documentation still contains Project-for-the-web redirection language, so test actual current URLs, tabs and deep links in the tenant rather than encoding the older behaviour. citeturn18search3turn20search22turn14search2 |
-| **February 2026 – refreshed Basic Planner UI.** Microsoft began rolling out a modernised interface, improved navigation, responsive layouts, a Goals experience and task chat. Training and migration screenshots/runbooks should therefore be prepared against the tenant's actual current UI, not legacy Planner screenshots. citeturn18search4 |
-| **June 2026 – current Planner licensing documentation refreshed.** Microsoft states Planner is included in eligible Microsoft 365/Office 365 suites for Basic use/basic editing of Premium, while Planner Plan 1 or Planner and Project Plan 3 supplies Premium capabilities. citeturn16search2 |
-| **June 2026 – Planner Agent reached GA in Microsoft 365 Copilot.** AI functionality is a separate licensing/design consideration rather than a prerequisite for this migration. Microsoft's current UK pricing page states that Planner Agent requires Microsoft 365 Copilot, with additional Planner-related AI functionality associated with paid Planner plans. citeturn18search2turn17search0 |
-| **30 September 2026 – Project Online retirement.** This is only weeks after the date of this report. Do not design new integration or rollback dependencies around Project Online simply because Planner and Project Plan 3 still contains legacy Project entitlements. Microsoft says Project desktop is unaffected. citeturn20search6 |
-
-### Licence model for 80 users
-
-A paid licence is required for a user to access Premium features, but Microsoft explicitly permits Planner-in-Microsoft-365 users to perform basic editing in Premium plans created by licensed users, including assigning tasks, changing dates and adding attachments. Planner Plan 1 is required for additional views such as Timeline, People and Goals; Planner and Project Plan 3 is needed for higher-end capabilities such as Assignments view and includes task history, baselines/critical path and more advanced project management functionality. citeturn17search0turn21search4
-
-A sensible role model is therefore:
-
-| User cohort | Likely entitlement | Indicative rationale |
-|---|---|---|
-| Most of the 80 contributors | Existing qualifying Microsoft 365 licence | Update normal task fields without buying 80 Premium seats. citeturn16search2turn17search0 |
-| Workstream leads / schedulers | Planner Plan 1 | Timeline, People, Goals and structured Premium planning. citeturn17search0 |
-| Programme/project managers needing advanced scheduling/history | Planner and Project Plan 3 | Task history, Assignments view, baselines/critical path and more advanced dependencies. citeturn17search0turn17search1 |
-| Automation service owners | Planner licence **plus separate Power Platform assessment** | Planner licensing must not be assumed to license arbitrary Premium/custom Power Automate connectors. citeturn20search3turn20search7 |
-
-At UK list prices current on **12 August 2026**, illustrative annual ex-VAT costs are:
-
-| Premium users | Plan 1 | Plan 3 |
+| Premium users | Planner Plan 1 | Planner and Project Plan 3 |
 |---:|---:|---:|
-| 5 | £462 | £1,386 |
-| 10 | £924 | £2,772 |
-| 20 | £1,848 | £5,544 |
-| 80 | £7,392 | £22,176 |
+| 5 | €522 | €1,560 |
+| 10 | €1,044 | €3,120 |
+| 20 | €2,088 | €6,240 |
+| 80 | €8,352 | €24,960 |
 
-These figures use Microsoft's £7.70 and £23.10 per-user/month annual-subscription list prices; enterprise agreements, CSP pricing and discounts may differ. citeturn17search0
+These are Microsoft Ireland public list prices, not necessarily your enterprise/CSP price.
 
-For Power Automate, a rebuilt flow that uses premium/custom connectors may require Power Automate Premium licensing or a Process licence. Microsoft states that Power Automate Premium includes premium connectors, while a Process licence assigned to a cloud flow allows that flow to use standard, premium and custom connectors for organisational users. Licensing should therefore be assessed **flow by flow**, particularly where Premium Planner/Dataverse is combined with SharePoint, SQL, custom APIs or third-party systems. citeturn20search3turn20search7
+**Do not assume all 80 users need a paid Premium licence.** Users with qualifying Microsoft 365 entitlement can perform basic editing in a shared Premium plan. Identify who actually needs Premium views and project-management features, then license by role.
 
-## Task reduction, archival and compliance design
+Power Automate licensing is separate. Rebuilt integrations that use Premium or custom connectors may require Power Automate Premium or Process licensing. Assess this flow by flow.
 
-### Recommended reduction target
+---
 
-Do not aim for 2,999. A plan landing one task below its absolute technical ceiling has no operating margin and could exceed the cap through normal task creation during cutover.
+## Basic versus Premium: functionality that must be checked
 
-**Recommended migration acceptance threshold: ≤2,700 tasks.**
+Premium adds the capabilities most teams migrate for, including Timeline/Gantt, dependencies, milestones, custom fields, conditional colouring, People view, critical path, backlogs/sprints, goals and custom calendars. Exact capability depends on the user's licence.
 
-Starting with 6,000 tasks:
+However, Microsoft's current comparison identifies several Basic-only capabilities. Before migration, specifically check whether the team depends on:
 
-- absolute minimum reduction to get below 3,000 = **3,001 tasks**;
-- recommended reduction to 2,700 = **3,300 tasks**;
-- a more conservative 2,500-task target = **3,500 tasks**.
+- recurring tasks;
+- Schedule view;
+- Planner-to-Outlook calendar integration;
+- SharePoint Planner web part/full-page integration;
+- plans embedded in Loop;
+- Teams/mobile workflows;
+- existing task conversation behaviour.
 
-The 2,700 recommendation is an implementation control rather than a Microsoft requirement; Microsoft's published hard Premium limit remains 3,000 total tasks. citeturn14search3
+Do not approve production migration until a replacement or accepted loss has been agreed for every business-critical Basic-only feature.
 
-The first audit should calculate at least: total tasks, active/completed counts, completed age distribution, tasks created/updated in the last 30/90/365 days, orphaned assignees, unassigned tasks, duplicates, tasks without meaningful descriptions or dates, recurring-series tasks, tasks with attachments, comments/task chat, checklists, external references and automation-created tasks. With 6,000 total tasks under the current Basic limit, the active count should also be explicitly checked against Basic's 3,000-active-task ceiling. citeturn14search0
+---
 
-### Reduction options
+# Migration plan
 
-| Strategy | Appropriate use | Advantages | Principal drawbacks | Recommendation |
-|---|---|---|---|---|
-| **Governed export + remove from live plan** | Old/completed work retained for audit/reference | Highest task-count reduction; low operational overhead; can preserve structured metadata | Historical items cease to be interactive Planner tasks; richer evidence needs more than a simple spreadsheet | **Primary archive strategy** |
-| **Separate Basic archive plan** | A small subset of historical tasks must remain navigable as Planner tasks | Familiar UI; can preserve more Planner context | Moving to another plan is operationally expensive; UI Move supports a single task at a time; some metadata changes across plans | Use selectively. citeturn21search0 |
-| **Split current work into multiple plans** | 3,000+ tasks are genuinely still operational | No arbitrary deletion; clearer workstream boundaries | Fragmented reporting, governance and integration; multiple plans to maintain | Prefer over destructive deletion if business scope genuinely exceeds one project |
-| **Consolidate microtasks into checklists/subtasks** | Many tasks are merely steps of one deliverable | Large reduction with retained operational detail | Individual task dates, assignees, history and reporting granularity may be lost; Basic checklist has 20-item limit | Use on genuinely granular work only. citeturn14search0 |
-| **Delete duplicates/test/obsolete tasks** | No retention or business value | Fast, cleanest dataset | Destructive; wrong classification can destroy evidence | Only against signed-off deletion manifest |
-| **Mark complete only** | Work is finished but record still belongs in plan | Easy | **Does not solve Premium total-task ceiling** | Insufficient by itself. citeturn14search0turn14search3 |
+## Phase 1 - Discovery and baseline
 
-The preferred combination is **export/archive + approved deletion + selective consolidation + scope splitting**. Attempting to “compress” thousands of legitimate historical records into checklists merely to satisfy a product limit would compromise traceability.
+Create a complete inventory before changing the plan.
 
-Microsoft now supports copying multiple Basic tasks, but moving between plans is still a single-task operation. When a task is copied to another plan, comments and task chat are not copied. When a task is *moved* to another plan in the same Microsoft 365 group, Microsoft states that comments, assignees and attachments are kept, but goals, labels and custom-column values are removed. Moving across groups also removes comments and can affect attachment access. Consequently, a same-group “archive plan” offers better fidelity than a cross-group move but remains awkward for thousands of tasks and should not be the default archival method. citeturn21search0
+Record:
 
-### Evidence and retention package
+- Basic plan ID and associated Microsoft 365 group;
+- plan and group owners;
+- all members and guests;
+- current Microsoft 365 and Planner licences;
+- total and active task counts;
+- completed-task age profile;
+- buckets and labels;
+- recurring tasks;
+- attachments, comments, checklists and external references;
+- Teams tabs and links;
+- Outlook calendar use;
+- SharePoint Planner web parts;
+- Loop usage;
+- Power Automate flows;
+- Graph scripts/app registrations;
+- Power BI/reporting dependencies;
+- third-party integrations;
+- any compliance, retention, legal-hold or eDiscovery requirements.
 
-Before any deletion, create three artefacts:
+Take an initial **Planner Export to Excel** and, while the plan is still Basic, a richer API-level snapshot if required for technical reconstruction or audit evidence.
 
-**A native Planner Excel export** for business-readable review. Microsoft supports Export to Excel for both Basic and Premium plans. citeturn16search0
+### Exit criterion
 
-**A richer Basic-plan API extract** taken while Graph still has access, containing task IDs and task-detail data needed for reconstruction/audit. Microsoft Graph Planner supports Basic plans and exposes plan tasks plus their detail resources; after conversion it cannot be used to read Premium plan/tasks. citeturn15search1
+Nothing proceeds until every integration and business-critical Planner feature has an owner and disposition.
 
-**An approved deletion/archive manifest**, for example:
+---
 
-```csv
-PlanId,TaskId,ETag,Title,Bucket,Status,CompletedDate,Assignees,RetentionClass,Disposition,Reason,EvidenceLocation,ApprovedBy,ApprovedDate
-abc123,t-001,"W/""JzEtVGFzay...""","Legacy deployment","Closed",100,2024-02-14,"user@org.co.uk","Project-7Y","ArchiveDelete","Completed > retention cutoff","/Records/Planner/2026-08/export.json","ProgrammeOwner",2026-09-02
-```
+## Phase 2 - Decide what belongs in Premium
 
-Store the evidence in an organisation-controlled repository such as a governed SharePoint records library, with the appropriate retention/sensitivity controls determined by the organisation's records policy. Planner attachments themselves are stored in SharePoint, while Premium task data resides in Dataverse; therefore attachment retention and Planner task-data retention must be considered separately. citeturn15search0
+Every one of the 6,000 tasks should receive one disposition:
 
-### Compliance gate
+- **Migrate** - current work that belongs in the Premium plan;
+- **Archive** - history that must be retained but does not need to remain live in Planner;
+- **Move** - valid work belonging to another plan/workstream;
+- **Consolidate** - genuine microtasks that can safely become checklist/subtask-level work;
+- **Delete** - duplicate, test or obsolete material approved for deletion;
+- **Review** - business owner decision required.
 
-This migration changes the compliance surface. Microsoft's currently published Planner compliance page says:
+Do not delete based on age alone unless that rule is consistent with the organisation's retention policy.
 
-- group-contained Basic plans support Purview eDiscovery and history;
-- Premium plans currently do **not** receive that same Planner eDiscovery/history support;
-- integrated audit logs operate across Planner plan types/containers;
-- Planner retention policy is not currently supported;
-- Premium plan data is stored in Dataverse;
-- file attachments are stored in SharePoint. citeturn15search0
+### Target
 
-Therefore, before deletion or conversion, the organisation's Records/Legal/Compliance owner should sign off on: retention period, legal holds, deletion eligibility, evidentiary export fields, attachment preservation, where the exported evidence will be stored, who can access it and how later discovery requests will be serviced.
+- Microsoft hard Premium limit: **3,000 total tasks**
+- Recommended cutover ceiling: **2,700 total tasks**
+- Preferred operating range at migration: **2,500-2,700 tasks**
 
-**A legal hold or regulatory requirement that depends on today's Basic-Plan Purview eDiscovery behaviour is a possible migration blocker** until an acceptable replacement control has been approved. That conclusion is an inference from Microsoft's documented difference in Purview support. citeturn15search0
+From 6,000 tasks, reaching 2,700 requires removing **3,300 tasks** from the migration population.
 
-## Step-by-step migration and integration reconfiguration
+---
 
-### Discovery and audit
+## Phase 3 - Archive and reduce
 
-**Establish technical eligibility.** Record tenant/cloud, Basic plan ID, Microsoft 365 group/container ID, plan owners, group owners, members/guests and licences. Confirm that the source is a Microsoft 365-group-shared Basic plan: Microsoft currently documents group-shared Basic plans as eligible for conversion, while Published Plans and Loop task-list plans cannot be converted. Conversion is not available in GCC under the published conversion procedure. citeturn14search2
+Preferred order:
 
-**Freeze a baseline.** Capture the plan's current total and active task counts, bucket structure, label definitions, membership, recurring tasks, calendar settings and rate of new-task creation. Export Excel and take an API-level snapshot before cleanup.
+1. Export and preserve required historical information.
+2. Delete approved duplicates/test/obsolete tasks.
+3. Move genuinely separate active work into an appropriate plan.
+4. Consolidate only true microtasks where loss of individual task metadata is acceptable.
+5. Reconcile the remaining task population against the approved manifest.
 
-**Build a task disposition dataset.** Assign every task one of: `Migrate`, `Archive`, `Consolidate`, `Move-to-other-plan`, `Delete`, `Needs-business-review`. No task should be deleted because of age alone unless the age rule corresponds to an approved retention/disposition policy.
+Do not use "mark complete" as the reduction strategy because completed tasks still count against Premium's total-task limit.
 
-**Inventory every integration by source-plan ID.** Search Power Automate solutions/flows, application registrations, Graph scripts, Teams tabs, SharePoint pages, Outlook calendar links, Loop pages, Power BI models and third-party platforms for the Basic plan ID or group ID.
+For evidence-sensitive data, preserve more than a spreadsheet if required. Planner attachments reside in SharePoint, while Premium plan data uses Dataverse, so attachment preservation and task-data preservation should be treated separately.
 
-**Identify Basic-only user behaviour.** Specifically interview owners of recurring tasks, Outlook calendar integration, SharePoint Planner web parts, Loop task lists and Teams mobile use because Microsoft's current feature matrix does not treat all of these as Premium equivalents. citeturn16search0
+---
 
-### Reduce the task set
+## Phase 4 - Rebuild and test integrations
 
-Pause or temporarily gate automated processes that create tasks. Otherwise the cleanup target can drift while the team is reducing it.
+This is a hard migration gate.
 
-Use Planner's Basic Grid bulk editing to normalise status, priority, owner and other classification fields where useful. Microsoft added bulk-edit capability to Basic plans in 2025. citeturn19search0
-
-Run the approved archival/export process. Validate row/task counts and evidence files before deleting anything.
-
-Consolidate true microtasks into a parent task/checklist only where business owners explicitly accept the loss of independent task-level granularity. A Basic Planner task has a maximum of 20 checklist items. citeturn14search0
-
-Separate active work that belongs to a different project/workstream into another plan rather than deleting it merely to satisfy Premium's cap.
-
-Delete only from an approved manifest and stop at a target of **≤2,700**, then run a second reconciliation against the baseline.
-
-### Example Basic-plan Graph/PowerShell extraction and controlled deletion
-
-The Microsoft Graph Planner API can be used **before** migration to query a Basic plan:
-
-```http
-GET /v1.0/planner/plans/{plan-id}/tasks
-```
-
-Microsoft documents that Planner resources use ETags and that PATCH/DELETE operations require the latest ETag through `If-Match`. Premium plans/tasks are explicitly unavailable through the Planner Graph API. citeturn15search1
-
-A simplified PowerShell snapshot pattern is:
-
-```powershell
-# Microsoft Graph PowerShell SDK
-Connect-MgGraph -Scopes "Tasks.ReadWrite","Group.Read.All"
-
-$planId = "<BASIC-PLAN-ID>"
-$uri = "https://graph.microsoft.com/v1.0/planner/plans/$planId/tasks"
-
-$allTasks = @()
-
-while ($uri) {
-    $page = Invoke-MgGraphRequest -Method GET -Uri $uri
-    $allTasks += $page.value
-    $uri = $page.'@odata.nextLink'
-}
-
-# Preserve the raw task objects, including IDs and ETags.
-$allTasks |
-    ConvertTo-Json -Depth 20 |
-    Set-Content ".\planner-basic-tasks.json" -Encoding UTF8
-
-# Business-readable inventory.
-$allTasks |
-    Select-Object id, title, percentComplete, startDateTime,
-                  dueDateTime, createdDateTime, '@odata.etag' |
-    Export-Csv ".\planner-basic-tasks.csv" -NoTypeInformation -Encoding UTF8
-```
-
-For a high-fidelity archive, also query each task's `/details` resource to capture descriptions, checklists and reference information before deletion. API exports should be tested against throttling and error-handling requirements rather than executed as an uncontrolled one-off script. Microsoft documents the Graph Planner data model and ETag concurrency requirements. citeturn15search1
-
-A deletion script should consume a *separately approved* CSV rather than selecting tasks inside the destructive script:
-
-```powershell
-$approved = Import-Csv ".\delete-approved.csv" |
-    Where-Object { $_.Approved -eq "YES" }
-
-foreach ($row in $approved) {
-    if ([string]::IsNullOrWhiteSpace($row.TaskId) -or
-        [string]::IsNullOrWhiteSpace($row.ETag)) {
-        Write-Warning "Skipping incomplete row: $($row.Title)"
-        continue
-    }
-
-    $headers = @{
-        "If-Match" = $row.ETag
-    }
-
-    try {
-        Invoke-MgGraphRequest `
-            -Method DELETE `
-            -Uri "https://graph.microsoft.com/v1.0/planner/tasks/$($row.TaskId)" `
-            -Headers $headers
-
-        Write-Host "Deleted approved task $($row.TaskId)"
-    }
-    catch {
-        # Do not silently retry conflicts: re-read the task and investigate
-        # because an ETag mismatch means the record changed after approval.
-        Write-Warning "FAILED $($row.TaskId): $($_.Exception.Message)"
-    }
-}
-```
-
-This deliberately fails rather than overriding concurrency conflicts: an ETag mismatch is evidence that the task changed after the deletion decision and should be re-reviewed. Microsoft requires `If-Match` for Planner modifications/deletions and documents 409/412 conflict handling around ETags. citeturn15search1
-
-For very large scripted operations, Microsoft Graph JSON batching supports grouping requests, but batch size is limited to 20 individual requests; throttling and retries still have to be engineered. citeturn9search22
-
-### Reconfigure integrations before conversion
-
-| Current dependency | Premium impact | Required action |
+| Current dependency | Premium concern | Action |
 |---|---|---|
-| **Microsoft Graph Planner API** | Cannot access Premium plans/tasks. citeturn15search1 | Replace Premium task operations with the supported Premium/Dataverse architecture; do not merely change a plan ID. |
-| **Power Automate using Basic Planner** | Microsoft explicitly says workflows must be modified after conversion. citeturn14search2 | Rebuild/test with Premium's supported Dataverse/Project Schedule mechanism, preferably in solutions; Microsoft documents V2 Project Schedule APIs for Power Automate. citeturn20search0 |
-| **Third-party app using Planner Graph** | Will lose Premium task API access. citeturn15search1 | Obtain vendor confirmation of Premium support before cutover; otherwise redesign or retire. |
-| **Teams tab** | Premium is usable in Teams; conversations require plan added to a Teams channel. citeturn16search0 | Re-pin/validate tabs, permissions, task conversations and deep links after conversion. |
-| **SharePoint Planner web part/full-page app** | Microsoft's feature comparison lists SharePoint integration as Basic-only. citeturn16search0 | Replace with approved navigation/link/reporting experience; separately retain attachment libraries and permissions. |
-| **Loop plan/task list** | Premium plan cannot be added to Loop; Loop task-list plans are not eligible for direct conversion. citeturn16search0turn14search2 | Keep affected workload Basic or redesign its boundary. |
-| **Outlook Planner calendar** | Listed as Basic-only. citeturn16search0 | Identify calendar-dependent users and replace the process before cutover. |
-| **Recurring Basic tasks** | Listed as Basic-only in Microsoft's current Basic-v-Premium comparison. citeturn16search0 | Use a Basic feeder plan or approved automated recurrence design; test licensing carefully. |
-| **Power BI/custom reporting** | Premium data is Dataverse-backed. citeturn15search0 | Repoint/test schema, security roles, refresh identities and downstream transformations. |
+| Microsoft Graph Planner API | Does not support Premium plans/tasks | Redesign rather than changing the plan ID |
+| Power Automate using Basic Planner | Existing workflows may not work unchanged | Rebuild using the supported Premium/Dataverse architecture and test licensing |
+| Third-party Planner integration | May depend on Basic Planner Graph APIs | Obtain written vendor confirmation of Premium support |
+| Teams tab/deep links | Location/behaviour can change | Re-pin and validate |
+| SharePoint Planner web part | Listed as Basic-only | Replace the user experience if required |
+| Outlook Planner calendar | Listed as Basic-only | Replace or formally accept loss |
+| Loop | Premium support differs | Redesign affected workflow |
+| Recurring tasks | Listed as Basic-only | Replace recurrence process before migration |
+| Power BI/custom reporting | Premium is Dataverse-backed | Repoint and retest data model/security |
 
-Where Power Automate redesign introduces premium or custom connectors, explicitly determine whether the flow is covered by a user Power Automate Premium licence or a flow-level Process licence. Microsoft states that the latter can license a cloud flow to use standard, premium and custom connectors for organisational users. citeturn20search3turn20search7
+Do not migrate production until every critical integration passes end-to-end testing.
 
-### Permissions and conversion
+---
 
-Ensure the underlying Microsoft 365 group has at least two accountable owners and reconcile its membership against the intended 80-person team. Conversion preserves access for users who already have access to the Basic plan, and Microsoft states that Microsoft 365-licensed users and guests can continue to work in the Premium plan subject to their permitted capabilities. citeturn14search2
+## Phase 5 - Representative pilot
 
-Assign Premium licences **before UAT** to the people who will test Premium-specific capabilities. Avoid buying all 80 until the access matrix demonstrates the business requirement.
+Do not make the 6,000-task production plan the first conversion test.
 
-At cutover:
+Create a representative Basic test plan containing examples of:
+
+- normal and multi-assignee tasks;
+- attachments;
+- checklists;
+- labels;
+- comments/task conversations;
+- recurring tasks;
+- unusual dates;
+- guest assignments;
+- Teams integration;
+- tasks created or updated by each automation.
+
+Convert the test plan and run UAT with actual business users.
+
+### Minimum UAT acceptance
+
+- intended users can access the plan;
+- licensed and unlicensed user behaviour matches expectations;
+- task titles, status, dates, assignees and buckets are correct;
+- critical attachments open with correct permissions;
+- required Premium features work;
+- all critical automations work without duplication;
+- Teams links/tabs work;
+- reporting works;
+- mobile-dependent workflows are tested;
+- archive/evidence package is approved.
+
+---
+
+## Phase 6 - Production cutover
+
+Use a short communicated edit freeze.
+
+Cutover sequence:
 
 1. Stop task-creating automations.
-2. Communicate a brief edit freeze.
-3. Take the final Excel/API evidence snapshot.
-4. Confirm total task count ≤2,700 and no unresolved disposition items.
-5. Confirm Compliance sign-off.
-6. Confirm all critical replacement integrations passed UAT.
-7. Open the Basic plan in current Planner and invoke the Premium conversion option from the plan's Premium-view controls.
-8. Monitor for either successful in-place conversion or Microsoft's incompatibility/import fallback.
-9. Validate memberships, task counts and representative task fidelity.
-10. Re-enable only the **new tested** integration paths. citeturn14search2
+2. Freeze user edits.
+3. Take final Excel/API evidence snapshot.
+4. Confirm **2,700 tasks or fewer**.
+5. Confirm no unresolved task dispositions.
+6. Confirm business and compliance approval.
+7. Confirm every critical replacement integration passed UAT.
+8. Perform the Basic-to-Premium conversion in the current Planner experience.
+9. Validate task counts, membership, permissions, attachments and representative records.
+10. Update Teams tabs/bookmarks/documentation.
+11. Re-enable only the new, tested integration paths.
+12. Remove the edit freeze after validation.
 
-Microsoft says conversion itself can take only a few minutes; the significant effort is the preparation, data governance and integration redesign. citeturn14search2
+The actual Microsoft conversion may be relatively quick. The preparation, data reduction and integration redesign are the substantial parts of the project.
 
-## Testing, rollback, timeline and resources
+---
 
-### Test strategy
+## Phase 7 - Hypercare and rollback control
 
-Do not make the 6,000-task production plan the first experiment. Build a representative test Basic plan containing samples of every important construct: multi-assignee tasks, attachments, checklists, labels, comments/task chat, recurring tasks, unusual dates, guest assignments, Teams integration and tasks produced by each automation.
+Microsoft's conversion process provides a downgrade/rollback path for a limited period, but it should **not** be treated as a normal backup. A downgrade returns the Basic plan to its pre-conversion state; work subsequently performed in Premium is not automatically written back into that old Basic plan.
 
-A practical UAT acceptance standard is:
+Use an initial **3-5 working day high-confidence hypercare period** and retain a daily Premium export/change record during that period.
 
-| Test | Proposed acceptance criterion |
-|---|---|
-| Task population | Production candidate ≤2,700; count reconciles to approved manifest |
-| Core field fidelity | 100% of a statistically/operationally representative sample matches title, status, dates, assignees and bucket |
-| Attachments | 100% of critical sample opens with correct permissions |
-| Membership | All intended 80 users can reach plan; role/licence behaviour matches matrix |
-| Premium capabilities | Licensed users can use required Timeline/People/Goals/dependency/history features appropriate to their licence |
-| Power Automate | Every critical flow passes happy-path, error-path and duplicate-prevention tests |
-| Teams | New tab/deep links and task conversations operate as intended |
-| SharePoint | No broken business-critical link to supporting files |
-| Third party | Vendor-supported integrations pass end-to-end |
-| Compliance | Export is complete, access-controlled and signed off |
-| Performance | Representative Grid/Board/Timeline usage acceptable with ~2,700 tasks |
-| Mobile | Tested for any mobile-dependent user cohort because some Premium endpoints differ from Basic. citeturn16search0 |
+Suggested rollback triggers:
 
-### Rollback is a restore-to-cutover-state, not an undo button
+- material task-data mismatch;
+- missing business-critical attachments;
+- significant access failure;
+- critical integration failure without a safe workaround;
+- unresolved compliance issue;
+- unacceptable operational performance.
 
-Successful conversion gives a particularly useful 90-day contingency: Microsoft makes the Basic plan read-only/archive-held for 90 days and allows downgrade during that period. But Microsoft is explicit that downgrade restores the Basic plan to **the point at which it was upgraded**. Edits made afterwards in Premium must be copied back manually. citeturn14search2turn14search4
+If rollback occurs, post-cutover Premium changes must be reconciled deliberately.
 
-Accordingly, establish a short **high-confidence rollback period of approximately 3–5 working days**, even though Microsoft's technical downgrade window lasts 90 days. During hypercare, retain a daily Premium Excel export/change log. If a severe defect forces downgrade, use that evidence to reconcile post-cutover changes manually.
+---
 
-Suggested rollback triggers are: material conversion/import incompatibility; missing business-critical attachments; more than ~1% unexplained critical-field mismatches; inability of a significant user cohort to access the plan; failure of a core integration without an acceptable workaround; or discovery of an unresolved compliance problem. These thresholds are proposed project controls, not Microsoft product limits.
+# Compliance gate
 
-Do **not** plan on Microsoft Graph as the mechanism for exporting changed Premium tasks during rollback because Microsoft's Planner Graph API does not support Premium plans. Use Premium-supported export/Dataverse mechanisms instead. citeturn15search1turn16search0
+Planner Basic and Premium do not have identical storage and compliance characteristics. Premium plan data is Dataverse-backed, while attachments are stored in SharePoint. Microsoft's current Planner compliance documentation also distinguishes capabilities available for group-contained Basic plans and Premium plans.
 
-### Illustrative schedule
+Before deleting tasks or converting the plan, obtain a decision from the organisation's Records/Legal/Compliance owner covering:
 
-The Mermaid timeline rendered with this report assumes work begins **Monday, 17 August 2026**, production conversion on **10 September 2026**, and a subsequent 90-day Microsoft downgrade window. The schedule is deliberately front-loaded around inventory, records decisions and integration work; those are much higher-risk than the few-minute conversion operation itself. Microsoft's Project Online retirement on 30 September 2026 is also a reason not to introduce new dependencies on that legacy service during this project. citeturn14search2turn20search6
+- retention period;
+- legal holds;
+- deletion eligibility;
+- required archive fields;
+- attachment preservation;
+- archive location and permissions;
+- later eDiscovery/investigation requirements.
 
-A textual equivalent is:
+If the existing Basic plan is relied upon for a compliance capability that is not equivalent in Premium, treat that as a **go/no-go issue**, not a post-migration task.
 
-| Period | Main activity | Exit criterion |
-|---|---|---|
-| 17–21 Aug | Discovery, licence, compliance and integration audit | Complete inventory and eligibility decision |
-| 24–27 Aug | Archive/export pilot | Evidence package independently reconciled |
-| 24 Aug–4 Sep | Integration rebuild in parallel | Critical replacements pass technical test |
-| 26 Aug–4 Sep | Business classification and reduction | ≤2,700 approved production tasks |
-| 3–9 Sep | Representative conversion test and UAT | Business/IT/Compliance go decision |
-| 10 Sep | Production freeze, final export and conversion | Premium plan validated |
-| 10–18 Sep | Hypercare | No unresolved severity-one defects |
-| To 9 Dec approximately | Microsoft 90-day downgrade contingency | Formal closure after rollback period expires |
+---
 
-The final date of the 90-day period should be taken from the actual conversion timestamp shown by Microsoft rather than from this illustrative calendar. Microsoft states the Basic plan is held for 90 days after conversion. citeturn14search2
+# Non-technical stakeholder meeting talking points
 
-### Resource estimate
+### What is changing?
 
-For an 80-person team and 6,000-task source, a realistic implementation is approximately **35–55 person-days**, excluding a major rewrite of an unsupported third-party system. This is a project estimate, not a Microsoft figure.
+"We are moving the team's Planner from the standard task-management model to Premium so the team can use stronger project-management capabilities such as timelines, dependencies and workload planning."
 
-| Role | Estimated effort | Primary responsibility |
-|---|---:|---|
-| Project/change lead | 8–12 days | Governance, stakeholder decisions, cutover/change communications |
-| Planner/Power Platform engineer | 12–18 days | Extraction, automation, Premium configuration, integration rebuild |
-| Microsoft 365 / Entra / Teams admin | 3–5 days | Groups, ownership, licensing, Teams |
-| Compliance/records specialist | 3–5 days | Retention, legal hold, export evidence, sign-off |
-| Integration owners | 2–5 days each | Rebuild/test individual flows/apps |
-| Business SMEs / UAT users | 8–16 days aggregate | Task disposition and acceptance |
-| Service desk/training | 2–4 days | User communications and hypercare |
+### Why can't we simply switch it on?
 
-The largest schedule uncertainty is not the Microsoft conversion process; it is **human disposition of 3,300+ tasks plus unknown integration complexity**.
+"The existing plan contains about 6,000 tasks. Premium supports a maximum of 3,000 tasks in one plan, so we must first decide what current work belongs in the new plan and what historical work should be retained elsewhere."
 
-## Risks, stakeholder talking points and implementation checklist
+### What are we proposing?
 
-### Principal risks and mitigations
+"We will migrate approximately 2,500-2,700 current tasks. This gives the new plan room to grow instead of starting immediately at Microsoft's maximum limit."
 
-| Risk | Likelihood / impact | Mitigation |
-|---|---|---|
-| **Task count remains too close to 3,000** | High / High | Target ≤2,700; freeze automated creation before final reconciliation. Premium hard limit is 3,000. citeturn14search3 |
-| **Completed tasks are mistaken for “removed” tasks** | High / High | Measure total, not just active tasks; Premium ceiling counts total tasks. citeturn14search0turn14search3 |
-| **Loss of legal/eDiscovery capability** | Medium–High / Very High | Compliance gate; preserve controlled evidence; validate legal-hold requirements because Microsoft currently distinguishes Basic and Premium Purview eDiscovery support. citeturn15search0 |
-| **Power Automate stops after migration** | High where flows exist / High | Inventory by plan ID; rebuild before cutover using Premium-supported APIs; test licensing. Microsoft explicitly requires workflow modification. citeturn14search2turn20search0 |
-| **Third-party/Graph app fails** | High if Graph-based / High | Vendor sign-off or replacement: Planner Graph does not expose Premium. citeturn15search1 |
-| **Unexpected Basic-only feature loss** | Medium / Medium–High | Audit recurring tasks, Outlook calendar, SharePoint web parts, Loop and mobile use. citeturn16search0 |
-| **Archive does not preserve enough evidence** | Medium / High | Native Excel + richer API extract + attachment inventory + signed manifest before deletion |
-| **Cross-plan archive loses metadata** | Medium / Medium | Prefer governed export; Microsoft documents comments/labels/goals differences when copying/moving tasks. citeturn21search0 |
-| **Rollback causes loss of post-cutover work** | Medium / High | Daily Premium export/change log during hypercare; downgrade restores pre-conversion state only. citeturn14search4 |
-| **Over-licensing all 80 users** | Medium / Medium | Role-based licence matrix; ordinary M365 users retain basic edit capabilities in shared Premium plans. citeturn17search0turn16search2 |
-| **Under-licensing automation** | Medium / High | Separate Power Automate licensing review for premium/custom connector use. citeturn20search3turn20search7 |
-| **Outdated implementation instructions** | Medium / Medium | Test against actual tenant; Microsoft transitioned to unified Planner and refreshed its UI during 2025–26. citeturn18search3turn18search4 |
-| **Building on Project Online just before retirement** | Low–Medium / High | Exclude Project Online from new design; it retires 30 September 2026. citeturn20search6 |
+### Will historical information be lost?
 
-### Non-technical stakeholder talking points
+"No information approved for retention will be deliberately discarded. Historical information will be exported and retained under an agreed records process before any deletion takes place."
 
-- **This is a controlled clean-up as well as an upgrade.** The present Planner can contain 6,000 historical tasks, but Premium can hold only 3,000 in total; we therefore propose keeping roughly 2,700 current tasks and retaining older information separately. citeturn14search0turn14search3
-- **Historical information will be retained according to policy before anything is deleted.** The archive will be reconciled and approved by business and compliance owners.
-- **Not everybody needs a new Premium licence.** Most team members can continue routine task editing with qualifying Microsoft 365 licences; Premium licences should be assigned to users who require advanced planning capabilities. citeturn17search0
-- **The principal technical risk is integration compatibility, not the Planner conversion itself.** Microsoft explicitly requires Basic Planner workflows and apps to be modified for Premium, and Graph Planner integrations cannot simply point at the Premium plan. citeturn14search2turn15search1
-- **There is a Microsoft-backed 90-day downgrade option**, but it restores the old plan to its conversion-day state, so post-migration work must be separately captured during the initial support period. citeturn14search2turn14search4
-- **Compliance is a go/no-go decision.** Microsoft's current documentation gives group-based Basic plans stronger Planner-specific Purview eDiscovery/history support than Premium plans, so Records/Legal approval is required before the move. citeturn15search0
-- **A five-week preparation-and-cutover programme is realistic** under the assumptions in this report; the bulk of the work is deciding what to retain and rebuilding unknown integrations, rather than clicking the conversion control.
+### What is the biggest risk?
 
-### Implementation checklist
+"The biggest risk is the integrations around Planner. Some existing automations and applications use the Basic Planner architecture and cannot simply be pointed at Premium. We will identify and test those before migration."
 
-**Governance and discovery**
+### Will everyone need a new licence?
 
-- [ ] Confirm commercial/GCC/GCC High/DoD tenant and Premium conversion eligibility. citeturn14search2
-- [ ] Record plan ID, group ID, owners, 80 members, guests and current licences.
-- [ ] Count total versus active tasks and confirm bucket/task-limit compliance. citeturn14search0
-- [ ] Inventory recurring tasks, Outlook calendar, Loop, SharePoint web parts and mobile requirements. citeturn16search0
-- [ ] Inventory Power Automate, Graph scripts/app registrations, Teams tabs, reporting and third parties.
-- [ ] Obtain Records/Legal decision on retention, eDiscovery and legal holds. citeturn15search0
+"Not necessarily. Many users can perform routine task editing with their existing qualifying Microsoft 365 entitlement. Paid Planner licences should be allocated to people who actually require Premium planning features."
 
-**Data reduction**
+### What changes might users notice?
 
-- [ ] Capture initial Planner Excel export.
-- [ ] Capture Basic Planner Graph/JSON export and attachment inventory. citeturn15search1
-- [ ] Classify all 6,000 tasks.
-- [ ] Pilot archive and independently reconcile task counts.
-- [ ] Approve deletion manifest.
-- [ ] Consolidate only genuinely granular work.
-- [ ] Move/split current work that belongs in another plan.
-- [ ] Pause automated task creation.
-- [ ] Reduce source candidate to **≤2,700 total tasks**.
-- [ ] Take final pre-conversion export and evidence hash/version.
+"Premium is not identical to Basic. Some familiar functions, including recurring-task and calendar/embedding scenarios, differ or may not be available in the same way. We will identify any workflows the team relies on and agree replacements before cutover."
 
-**Licensing and integrations**
+### How will we protect the business?
 
-- [ ] Assign Plan 1/Plan 3 only to roles needing Premium functionality. citeturn17search0
-- [ ] Review Power Automate Premium/Process licensing for rebuilt flows. citeturn20search3turn20search7
-- [ ] Replace Basic Planner Graph integrations; Graph Planner does not support Premium. citeturn15search1
-- [ ] Rebuild critical flows with Premium-supported Dataverse/Project Schedule APIs. citeturn20search0
-- [ ] Obtain vendor certification for every third-party integration.
-- [ ] Replace Basic-only SharePoint/Loop/calendar/recurrence processes where required. citeturn16search0
-- [ ] Configure/test Teams channel and Premium-plan task conversations. citeturn16search0
+"We will test a representative plan first, preserve the source data, run a controlled edit freeze for cutover, validate the new plan before reopening it, and maintain a rollback contingency during the initial support period."
 
-**Testing and cutover**
+### What decisions do we need from stakeholders?
 
-- [ ] Convert representative test plan first.
-- [ ] Complete field, attachment, permission, Teams, automation and mobile UAT.
-- [ ] Obtain business, IT and Compliance go/no-go approvals.
-- [ ] Apply production edit freeze.
-- [ ] Verify final task total ≤2,700.
-- [ ] Convert through current Planner Premium conversion controls. citeturn14search2
-- [ ] Check for Microsoft's successful-conversion path versus incompatibility/import fallback. citeturn14search2
-- [ ] Reconcile task/member counts and representative records.
-- [ ] Re-enable only tested Premium-compatible integrations.
-- [ ] Update Teams tabs, bookmarks, documentation and user guidance.
+1. Agree what counts as current versus historical work.
+2. Nominate business owners to classify ambiguous tasks.
+3. Confirm which Premium capabilities are actually required.
+4. Approve any replacement for Basic-only workflows.
+5. Approve the archive/retention approach.
+6. Approve the cutover window and short edit freeze.
+7. Agree who has final go/no-go authority.
 
-**Hypercare and closure**
+### What does success look like?
 
-- [ ] Retain daily Premium export/change log during the initial rollback period.
-- [ ] Monitor automation failures, access errors and task-count growth.
-- [ ] Keep downgrade criteria and named decision authority available.
-- [ ] Remember that downgrade returns to **pre-conversion state**, not current Premium state. citeturn14search4
-- [ ] Maintain archived evidence under the approved retention regime.
-- [ ] Review Premium licence utilisation after 30–60 days.
-- [ ] Close rollback contingency only after the Microsoft 90-day Basic-plan retention window expires. citeturn14search2
+- no more than 2,700 tasks at cutover;
+- required historical records preserved;
+- all 80 intended users have appropriate access;
+- required Premium functionality works;
+- all critical integrations pass testing;
+- no business-critical attachment or data loss;
+- licensing matches actual user roles;
+- support issues are manageable during hypercare.
 
-**Overall recommendation:** proceed, subject to the compliance gate and integration inventory, using **≤2,700 tasks as the cutover ceiling, a governed historical archive, role-based Premium licensing and pre-cutover rebuilding of every Basic Planner API/workflow dependency**. This design provides sufficient headroom beneath Microsoft's 3,000-task Premium limit, minimises unnecessary licence expenditure and preserves the strongest practical rollback path available under Microsoft's current Planner conversion model. citeturn14search2turn14search3turn15search0turn15search1turn17search0
+---
+
+# Go/no-go checklist
+
+## Data
+
+- [ ] Total and active task counts confirmed.
+- [ ] All 6,000 tasks classified.
+- [ ] Migration population is **2,700 or fewer**.
+- [ ] Historical archive reconciled and approved.
+- [ ] Attachment preservation confirmed.
+
+## Users and licensing
+
+- [ ] All members, owners and guests inventoried.
+- [ ] Premium feature users identified.
+- [ ] Planner licences assigned before UAT.
+- [ ] Power Automate licensing reviewed separately.
+
+## Integrations
+
+- [ ] Power Automate flows inventoried.
+- [ ] Graph scripts/app registrations inventoried.
+- [ ] Third-party integrations confirmed Premium-compatible.
+- [ ] Teams tabs/deep links tested.
+- [ ] SharePoint, Outlook, Loop and recurring-task dependencies reviewed.
+- [ ] Reporting integrations tested.
+
+## Governance
+
+- [ ] Records/Legal/Compliance approval obtained where required.
+- [ ] Retention and deletion rules approved.
+- [ ] Business owner signs off task disposition.
+- [ ] Named go/no-go decision owner confirmed.
+
+## Cutover
+
+- [ ] Representative pilot completed.
+- [ ] UAT passed.
+- [ ] Final source export captured.
+- [ ] Automations paused.
+- [ ] Edit freeze communicated.
+- [ ] Final task count confirmed.
+- [ ] Premium conversion completed and validated.
+- [ ] Only tested integrations re-enabled.
+- [ ] Hypercare and rollback process active.
+
+---
+
+# Current official Microsoft references
+
+- Microsoft Learn: **Microsoft Planner limits**
+- Microsoft Support: **Compare Microsoft Planner basic vs. premium plans**
+- Microsoft Ireland: **Planner plans and pricing**
+- Microsoft Graph documentation: **Planner API overview and Planner resource support**
+- Microsoft Support/Learn: **Basic-to-Premium conversion and downgrade guidance**
+- Microsoft Learn: **Planner compliance and data-storage documentation**
+
+## Final recommendation
+
+Proceed with the migration, but treat it as a **data-governance and integration migration**, not a licence toggle.
+
+The safest design is:
+
+**6,000 source tasks -> governed archive and cleanup -> 2,500-2,700 live tasks -> representative Premium pilot -> integration UAT -> controlled production conversion -> 3-5 day hypercare -> ongoing task-count and licence governance.**
+
+Recheck Microsoft's Planner limits, Basic/Premium feature comparison, conversion guidance and Ireland pricing immediately before the production change because Planner continues to evolve.
