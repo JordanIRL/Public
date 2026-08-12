@@ -67,13 +67,13 @@ Premium adds the capabilities most teams migrate for, including Timeline/Gantt, 
 
 However, Microsoft's current comparison identifies several Basic-only capabilities. Before migration, specifically check whether the team depends on:
 
-- recurring tasks;
-- Schedule view;
-- Planner-to-Outlook calendar integration;
-- SharePoint Planner web part/full-page integration;
-- plans embedded in Loop;
-- Teams/mobile workflows;
-- existing task conversation behaviour.
+- Recurring tasks
+- Schedule view
+- Planner-to-Outlook calendar integration
+- SharePoint Planner web part/full-page integration
+- Plans embedded in Loop
+- Teams/mobile workflows
+- Existing task conversation behaviour
 
 Do not approve production migration until a replacement or accepted loss has been agreed for every business-critical Basic-only feature.
 
@@ -87,24 +87,24 @@ Create a complete inventory before changing the plan.
 
 Record:
 
-- Basic plan ID and associated Microsoft 365 group;
-- plan and group owners;
-- all members and guests;
-- current Microsoft 365 and Planner licences;
-- total and active task counts;
-- completed-task age profile;
-- buckets and labels;
-- recurring tasks;
-- attachments, comments, checklists and external references;
-- Teams tabs and links;
-- Outlook calendar use;
-- SharePoint Planner web parts;
-- Loop usage;
-- Power Automate flows;
-- Graph scripts/app registrations;
-- Power BI/reporting dependencies;
-- third-party integrations;
-- any compliance, retention, legal-hold or eDiscovery requirements.
+- Basic plan ID and associated Microsoft 365 group
+- Plan and group owners
+- All members and guests
+- Current Microsoft 365 and Planner licences
+- Total and active task counts
+- Completed-task age profile
+- Buckets and labels
+- Recurring tasks
+- Attachments, comments, checklists and external references
+- Teams tabs and links
+- Outlook calendar use
+- SharePoint Planner web parts
+- Loop usage
+- Power Automate flows
+- Graph scripts/app registrations
+- Power BI/reporting dependencies
+- Third-party integrations
+- Any compliance, retention, legal-hold or eDiscovery requirements
 
 Take an initial **Planner Export to Excel** and, while the plan is still Basic, a richer API-level snapshot if required for technical reconstruction or audit evidence.
 
@@ -118,12 +118,12 @@ Nothing proceeds until every integration and business-critical Planner feature h
 
 Every one of the 6,000 tasks should receive one disposition:
 
-- **Migrate** - current work that belongs in the Premium plan;
-- **Archive** - history that must be retained but does not need to remain live in Planner;
-- **Move** - valid work belonging to another plan/workstream;
-- **Consolidate** - genuine microtasks that can safely become checklist/subtask-level work;
-- **Delete** - duplicate, test or obsolete material approved for deletion;
-- **Review** - business owner decision required.
+- **Migrate** - current work that belongs in the Premium plan
+- **Archive** - history that must be retained but does not need to remain live in Planner
+- **Move** - valid work belonging to another plan/workstream
+- **Consolidate** - genuine microtasks that can safely become checklist/subtask-level work
+- **Delete** - duplicate, test or obsolete material approved for deletion
+- **Review** - business owner decision required
 
 Do not delete based on age alone unless that rule is consistent with the organisation's retention policy.
 
@@ -179,31 +179,31 @@ Do not make the 6,000-task production plan the first conversion test.
 
 Create a representative Basic test plan containing examples of:
 
-- normal and multi-assignee tasks;
-- attachments;
-- checklists;
-- labels;
-- comments/task conversations;
-- recurring tasks;
-- unusual dates;
-- guest assignments;
-- Teams integration;
-- tasks created or updated by each automation.
+- Normal and multi-assignee tasks
+- Attachments
+- Checklists
+- Labels
+- Comments/task conversations
+- Recurring tasks
+- Unusual dates
+- Guest assignments
+- Teams integration
+- Tasks created or updated by each automation
 
 Convert the test plan and run UAT with actual business users.
 
 ### Minimum UAT acceptance
 
-- intended users can access the plan;
-- licensed and unlicensed user behaviour matches expectations;
-- task titles, status, dates, assignees and buckets are correct;
-- critical attachments open with correct permissions;
-- required Premium features work;
-- all critical automations work without duplication;
-- Teams links/tabs work;
-- reporting works;
-- mobile-dependent workflows are tested;
-- archive/evidence package is approved.
+- Intended users can access the plan
+- Licensed and unlicensed user behaviour matches expectations
+- Task titles, status, dates, assignees and buckets are correct
+- Critical attachments open with correct permissions
+- Required Premium features work
+- All critical automations work without duplication
+- Teams links/tabs work
+- Reporting works
+- Mobile-dependent workflows are tested
+- Archive/evidence package is approved
 
 ---
 
@@ -232,18 +232,18 @@ The actual Microsoft conversion may be relatively quick. The preparation, data r
 
 ## Phase 7 - Hypercare and rollback control
 
-Microsoft's conversion process provides a downgrade/rollback path for a limited period, but it should **not** be treated as a normal backup. A downgrade returns the Basic plan to its pre-conversion state; work subsequently performed in Premium is not automatically written back into that old Basic plan.
+Microsoft's conversion process provides a downgrade/rollback path for a limited period, but it should **not** be treated as a normal backup. A downgrade returns the Basic plan to its pre-conversion state. Work subsequently performed in Premium is not automatically written back into that old Basic plan.
 
 Use an initial **3-5 working day high-confidence hypercare period** and retain a daily Premium export/change record during that period.
 
 Suggested rollback triggers:
 
-- material task-data mismatch;
-- missing business-critical attachments;
-- significant access failure;
-- critical integration failure without a safe workaround;
-- unresolved compliance issue;
-- unacceptable operational performance.
+- Material task-data mismatch
+- Missing business-critical attachments
+- Significant access failure
+- Critical integration failure without a safe workaround
+- Unresolved compliance issue
+- Unacceptable operational performance
 
 If rollback occurs, post-cutover Premium changes must be reconciled deliberately.
 
@@ -255,13 +255,13 @@ Planner Basic and Premium do not have identical storage and compliance character
 
 Before deleting tasks or converting the plan, obtain a decision from the organisation's Records/Legal/Compliance owner covering:
 
-- retention period;
-- legal holds;
-- deletion eligibility;
-- required archive fields;
-- attachment preservation;
-- archive location and permissions;
-- later eDiscovery/investigation requirements.
+- Retention period
+- Legal holds
+- Deletion eligibility
+- Required archive fields
+- Attachment preservation
+- Archive location and permissions
+- Later eDiscovery/investigation requirements
 
 If the existing Basic plan is relied upon for a compliance capability that is not equivalent in Premium, treat that as a **go/no-go issue**, not a post-migration task.
 
@@ -313,14 +313,14 @@ If the existing Basic plan is relied upon for a compliance capability that is no
 
 ### What does success look like?
 
-- no more than 2,700 tasks at cutover;
-- required historical records preserved;
-- all 80 intended users have appropriate access;
-- required Premium functionality works;
-- all critical integrations pass testing;
-- no business-critical attachment or data loss;
-- licensing matches actual user roles;
-- support issues are manageable during hypercare.
+- No more than 2,700 tasks at cutover
+- Required historical records preserved
+- All 80 intended users have appropriate access
+- Required Premium functionality works
+- All critical integrations pass testing
+- No business-critical attachment or data loss
+- Licensing matches actual user roles
+- Support issues are manageable during hypercare
 
 ---
 
