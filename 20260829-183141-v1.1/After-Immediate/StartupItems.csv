@@ -1,6 +1,0 @@
-"Name","Command","Location","User"
-"OneDriveSetup","C:\Windows\System32\OneDriveSetup.exe /thfirstsetup","HKU\S-1-5-20\SOFTWARE\Microsoft\Windows\CurrentVersion\Run","NT AUTHORITY\NETWORK SERVICE"
-"OneDriveSetup","C:\Windows\System32\OneDriveSetup.exe /thfirstsetup","HKU\S-1-5-19\SOFTWARE\Microsoft\Windows\CurrentVersion\Run","NT AUTHORITY\LOCAL SERVICE"
-"RtkAudUService","""C:\WINDOWS\System32\DriverStore\FileRepository\realtekservice.inf_amd64_7b66b6662cf6d72b\RtkAudUService64.exe"" -background","HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run","Public"
-"SecurityHealth","%windir%\system32\SecurityHealthSystray.exe","HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run","Public"
-"Steam","""C:\Program Files (x86)\Steam\steam.exe"" -silent","HKU\S-1-5-21-723448072-2921970108-715500622-1001\SOFTWARE\Microsoft\Windows\CurrentVersion\Run","DESKTOP-U6Q1GLO\Jordan"
