@@ -1,0 +1,141 @@
+Microsoft 365 PowerShell knowledge base — Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms
+Scope of this document: Search-UnifiedAuditLog RecordType and Operation values, Graph OData filter patterns and which need advanced query, KQL for content search, PowerShell idioms, documentation links.
+Lookup tables for the whole KB. Nothing here runs without a connection first — see the module table below.
+Source: m365-kb/08-reference.md (generated file — edit the source, not this)
+======================================================================
+
+## Search-UnifiedAuditLog: RecordType values
+
+- RecordType `ExchangeAdmin` (Id 1) covers Exchange admin cmdlets (Operation = the cmdlet name).
+- RecordType `ExchangeItem` (Id 2) covers Single-item mailbox actions.
+- RecordType `ExchangeItemGroup` (Id 3) covers Multi-item mailbox actions (move, delete).
+- RecordType `SharePoint` (Id 4) covers SharePoint non-file events.
+- RecordType `SharePointFileOperation` (Id 6) covers File access, edit, delete, download.
+- RecordType `OneDrive` (Id 7) covers OneDrive events.
+- RecordType `AzureActiveDirectory` (Id 8) covers Directory changes.
+- RecordType `AzureActiveDirectoryStsLogon` (Id 15) covers Sign-in (STS) events.
+- RecordType `SharePointSharingOperation` (Id 14) covers Sharing links and invitations.
+- RecordType `SecurityComplianceCenterEOPCmdlet` (Id 18) covers Defender/EOP admin cmdlets.
+- RecordType `ExchangeAggregatedOperation` (Id 19) covers Aggregated mailbox auditing.
+- RecordType `PowerBIAudit` (Id 20) covers Power BI.
+- RecordType `Discovery` (Id 24) covers Content search / eDiscovery activity.
+- RecordType `MicrosoftTeams` (Id 25) covers Teams.
+- RecordType `ThreatIntelligence` (Id 28) covers Phish and malware (Defender for Office 365).
+- RecordType `ComplianceDLPSharePoint` / `ComplianceDLPExchange` (Id 11 / 13) covers DLP matches.
+
+## Operations worth knowing
+
+- Mailbox access operations: `MailItemsAccessed`, `FolderBind`, `AttachmentAccess`, `MailboxLogin`, `Send`, `SendAs`, `SendOnBehalf`.
+- Mailbox delegation operations: `Add-MailboxPermission`, `AddFolderPermissions`, `ModifyFolderPermissions`, `UpdateCalendarDelegation`.
+- Inbox rules (BEC signal) operations: `New-InboxRule`, `Set-InboxRule`, `UpdateInboxRules`.
+- Files operations: `FileAccessed`, `FileModified`, `FileDownloaded`, `FileDeleted`, `FileRecycled`, `FileRenamed`, `FileCopied`.
+- Sharing operations: `SharingSet`, `SharingInvitationCreated`, `AnonymousLinkCreated`, `AnonymousLinkUsed`, `SecureLinkCreated`, `SharingRevoked`.
+- Entra operations: `Add member to group`, `Update user`, `Add service principal`, `Consent to application`, `UserLoggedIn`.
+- Teams operations: `TeamCreated`, `MemberAdded`, `MemberRemoved`, `TeamSettingChanged`, `MessageDeleted`.
+
+## Graph OData filter cheat sheet
+
+Advanced query = add `-ConsistencyLevel eventual -CountVariable c` (the header plus `$count=true`).
+
+- `eq`. Example: `-Filter "accountEnabled eq false"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): no.
+- `in`. Example: `-Filter "department in ('Sales','Legal')"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): no.
+- `startsWith`. Example: `-Filter "startsWith(displayName,'Sv')"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): no.
+- `lt gt le ge` on dates. Example: `-Filter "createdDateTime ge 2026-01-01T00:00:00Z"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): no.
+- `any` lambda. Example: `-Filter "assignedLicenses/any(x:x/skuId eq 05e9a617-0261-4cee-bb44-138d3ef5d965)"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): no.
+- `ne`. Example: `-Filter "companyName ne null"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): yes.
+- `not(...)`. Example: `-Filter "not(startsWith(displayName,'Svc'))"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): yes.
+- `endsWith` (only mail, otherMails, userPrincipalName, proxyAddresses). Example: `-Filter "endsWith(userPrincipalName,'#EXT#@contoso.com')"`. Requires advanced query (ConsistencyLevel eventual + CountVariable): yes.
+- Empty / single-item collections. Example: `-Filter 'assignedLicenses/$count eq 0'`. Requires advanced query (ConsistencyLevel eventual + CountVariable): yes.
+- `-Search`. Example: `-Search '"displayName:Sales"'`. Requires advanced query (ConsistencyLevel eventual + CountVariable): yes (header only, no `$count`).
+
+### Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms — Run an advanced query
+Command:
+    Get-MgUser -Filter "endsWith(userPrincipalName,'#EXT#@contoso.com')" -ConsistencyLevel eventual -CountVariable guestCount -All -Property Id,UserPrincipalName,CreatedDateTime
+
+Inside double quotes, escape `$count` with a **backtick** (`` `$count ``) — a backslash is not a PowerShell escape and leaves `assignedLicenses/\ eq 0`. Single-quoting the whole filter is safer.
+
+## KQL for content search
+
+Mail properties: `subject`, `from`, `to`, `cc`, `bcc`, `participants`, `recipients`, `sent`, `received`, `kind`, `hasattachment`, `attachmentnames`, `itemclass`, `size`, `category`.
+Site properties: `filename`, `fileextension`, `title`, `author`, `createdby`, `modifiedby`, `created`, `lastmodifiedtime`, `contenttype`, `documentlink`, `size`, `sharedwithusersowsuser`, `viewablebyexternalusers`, `sensitivetype`, `mipsensitivelabel`, `detectedlanguage`.
+
+- To Mail to or from one person in a window — KQL: `participants:user@contoso.com AND sent>=2026-01-01 AND sent<=2026-01-31`.
+- To Teams chat and IM only — KQL: `kind:microsoftteams OR kind:im`.
+- To Subject phrase plus attachment — KQL: `subject:"budget Q1" AND hasattachment:true`.
+- To One file type in a folder tree — KQL: `documentlink:"https://contoso.sharepoint.com/sites/Marketing/Shared Documents/*" AND fileextension:xlsx`.
+- To Externally shared documents — KQL: `viewablebyexternalusers:true AND contenttype:document NOT fileextension:aspx`.
+- Documents holding card numbers — KQL: `SensitiveType:"Credit Card Number.
+- To Documents with a sensitivity label — KQL: `MipSensitiveLabel=<label-guid>`.
+- To Exclude a sender — KQL: `-from:"Sara Davis"`.
+
+Values are prefix-match only (`cat*` works, `*cat` does not); a bare space between terms means OR; `subject:budget Q1` is not the same as `subject:"budget Q1"`.
+
+## PowerShell idioms this KB relies on
+
+### Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms — Filter server-side, not client-side
+Command:
+    Get-EXOMailbox -Filter "RecipientTypeDetails -eq 'SharedMailbox'" -ResultSize Unlimited
+
+`-Filter` runs on the server and is the difference between 4 seconds and 4 minutes; `Where-Object` is the fallback for properties `-Filter` will not accept.
+
+### Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms — Flatten a property to plain strings
+Command:
+    Get-MgGroupMember -GroupId $groupId -All | Select-Object @{n='UPN';e={$_.AdditionalProperties['userPrincipalName']}}
+
+`AdditionalProperties` is a dictionary, so `Select-Object userPrincipalName` on it yields blanks — index the key in a calculated property.
+
+### Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms — Calculated properties for nested or renamed values
+Command:
+    Get-EXOMailbox -ResultSize Unlimited -Properties ArchiveStatus | Select-Object DisplayName,@{n='SMTP';e={$_.PrimarySmtpAddress}},@{n='Aliases';e={$_.EmailAddresses -join ';'}}
+
+Join collections yourself — anything left as an array exports to CSV as `System.String[]`.
+
+### Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms — Export a report
+Command:
+    Get-EXOMailboxStatistics -Identity user@contoso.com | Select-Object DisplayName,ItemCount,TotalItemSize | Export-Csv ~/mbx.csv -NoTypeInformation -Encoding UTF8
+
+### Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms — Page a large Graph result
+Command:
+    Get-MgUser -All -Property Id,DisplayName,UserPrincipalName,AccountEnabled | Select-Object DisplayName,UserPrincipalName,AccountEnabled
+
+Without `-All` you get one page (100 objects); without `-Property` you get the default subset and everything else is null.
+
+### Reference: audit RecordTypes, OData filters, KQL, PowerShell idioms — Batch, don't parallelise
+Command:
+    Get-Content ~/users.txt | ForEach-Object { Set-Mailbox -Identity $_ -LitigationHoldEnabled $true; Start-Sleep -Milliseconds 200 }
+
+`ForEach-Object -Parallel` starts each iteration in a fresh runspace that has neither the module import nor your `Connect-*` session, so EXO, Teams, PnP and SPO cmdlets fail or trigger a re-auth per thread. Split the work into serial batches instead.
+
+## Docs
+
+- Exchange Online PowerShell: https://learn.microsoft.com/powershell/exchange/exchange-online-powershell.
+- Exchange cmdlet reference: https://learn.microsoft.com/powershell/module/exchangepowershell/.
+- Security & Compliance PowerShell: https://learn.microsoft.com/powershell/exchange/scc-powershell.
+- Teams PowerShell: https://learn.microsoft.com/powershell/module/microsoftteams/.
+- SharePoint Online Management Shell: https://learn.microsoft.com/powershell/module/sharepoint-online/.
+- PnP PowerShell: https://pnp.github.io/powershell/.
+- Microsoft Graph PowerShell SDK: https://learn.microsoft.com/powershell/microsoftgraph/overview.
+- Graph permissions reference: https://learn.microsoft.com/graph/permissions-reference.
+- Graph advanced queries: https://learn.microsoft.com/graph/aad-advanced-queries.
+- Entra built-in roles: https://learn.microsoft.com/entra/identity/role-based-access-control/permissions-reference.
+- Least-privileged role per task: https://learn.microsoft.com/entra/identity/role-based-access-control/delegate-by-task.
+- SKU / service plan identifiers: https://learn.microsoft.com/entra/identity/users/licensing-service-plan-reference.
+- Audit log activities: https://learn.microsoft.com/purview/audit-log-activities.
+- RecordType enum (Management Activity API): https://learn.microsoft.com/office/office-365-management-api/office-365-management-activity-api-schema.
+- KQL mailbox properties: https://learn.microsoft.com/purview/edisc-search-mailboxes.
+- KQL site properties: https://learn.microsoft.com/purview/edisc-search-sites.
+
+## Gotchas
+
+- SKU GUIDs and part numbers change as Microsoft renames products — resolve them live with `Get-MgSubscribedSku` before hardcoding, and treat the table above as a starting point.
+- `Get-Mailbox` and friends default to `-ResultSize 1000`; add `-ResultSize Unlimited` or you will silently report on a subset.
+- `Search-UnifiedAuditLog` returns 100 records by default, caps at 5,000 per call and 50,000 per paged session — page with `-SessionId`/`-SessionCommand ReturnLargeSet` and narrow the date range.
+- Audit `Operation` names are workload-specific and the interesting detail is inside the JSON `AuditData` blob, not the top-level columns: `$_.AuditData | ConvertFrom-Json`.
+- Graph `-Filter` support varies per property; `ne`, `not`, `endsWith` and `$count` filters return an error unless you add `-ConsistencyLevel eventual -CountVariable`.
+- Consent is not authorisation: `Connect-MgGraph -Scopes` only decides what the app may ask for — you still need the Entra role, and `-Scopes` is accretive across sessions.
+- `Get-EXOMailbox` returns the Minimum property set; anything you did not name in `-Properties`/`-PropertySets` comes back empty rather than erroring.
+- Arrays exported straight to CSV become `System.String[]`; `-join` them in a calculated property first.
+- One SPO service connection per session per geo — a second `Connect-SPOService` silently replaces the first.
+- `Connect-IPPSSession` works on Windows only and is unavailable in PowerShell 7 on macOS or Linux. `Microsoft.Online.SharePoint.PowerShell` is Windows-only and will not install on macOS or Linux.
+- EXO REST calls time out server-side at 15 minutes, so bulk loops must be batched; repeated connect/disconnect in one session leaks memory.
+- `Get-Help` for Exchange cmdlets is empty unless you connected with `Connect-ExchangeOnline -LoadCmdletHelp` (module 3.7.0+).

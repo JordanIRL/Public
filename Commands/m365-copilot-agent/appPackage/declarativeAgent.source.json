@@ -1,0 +1,69 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/declarative-agent/v1.8/schema.json",
+  "version": "v1.8",
+  "id": "m365PowerShellAdmin",
+  "name": "M365 PowerShell Admin",
+  "description": "Answers Microsoft 365 PowerShell administration questions with exact, runnable commands for Exchange Online, Teams, SharePoint and OneDrive, Purview, and Microsoft Graph. Grounded in a verified cookbook rather than model recall, so cmdlet and parameter names are real. States the module, connect cmdlet and permission needed with every answer, warns before destructive commands, and checks your platform before recommending anything Windows-only.",
+  "instructions": "$[file:instructions.md]",
+  "capabilities": "$[capabilities]",
+  "behavior_overrides": {
+    "special_instructions": {
+      "discourage_model_knowledge": true
+    },
+    "default_response_mode": "Auto"
+  },
+  "disclaimer": {
+    "text": "Commands come from a verified knowledge base, but tenants differ. Review any command that changes or deletes data before running it, and test bulk operations on a single object first."
+  },
+  "editorial_answers": "$[file:editorial-answers.json]",
+  "conversation_starters": [
+    {
+      "title": "Connect to a workload",
+      "text": "How do I connect to Exchange Online and Microsoft Graph with an MFA admin account?"
+    },
+    {
+      "title": "Mailbox permissions",
+      "text": "How do I give a manager full access to another user's mailbox without auto-mapping it?"
+    },
+    {
+      "title": "Offboard a leaver",
+      "text": "Walk me through offboarding a leaver in the correct order, including the litigation hold and licence steps."
+    },
+    {
+      "title": "Find forwarding rules",
+      "text": "How do I audit every mailbox in the tenant for external forwarding?"
+    },
+    {
+      "title": "Licence report",
+      "text": "How do I export a report of every licensed user and find unused licences?"
+    },
+    {
+      "title": "Stale accounts",
+      "text": "How do I find users who have not signed in for 90 days, including ones that never signed in?"
+    },
+    {
+      "title": "Teams policy in bulk",
+      "text": "How do I assign a Teams meeting policy to thousands of users in one batch?"
+    },
+    {
+      "title": "External sharing audit",
+      "text": "How do I list every SharePoint site where external sharing is enabled?"
+    },
+    {
+      "title": "OneDrive for a leaver",
+      "text": "How do I give a manager access to a departed employee's OneDrive?"
+    },
+    {
+      "title": "Search the audit log",
+      "text": "How do I search the unified audit log and page through more than 5,000 results?"
+    },
+    {
+      "title": "Expiring app secrets",
+      "text": "How do I find Entra app registrations with secrets or certificates expiring soon?"
+    },
+    {
+      "title": "My results look truncated",
+      "text": "My PowerShell report is missing users and I do not know why. How do I fix it?"
+    }
+  ]
+}

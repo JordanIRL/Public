@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "00000000-0000-0000-0000-000000000000",
+  "developer": {
+    "name": "Contoso IT",
+    "websiteUrl": "https://learn.microsoft.com/powershell/microsoft-365",
+    "privacyUrl": "https://learn.microsoft.com/powershell/microsoft-365",
+    "termsOfUseUrl": "https://learn.microsoft.com/powershell/microsoft-365"
+  },
+  "packageName": "com.contoso.m365powershelladmin",
+  "name": {
+    "short": "M365 PowerShell Admin",
+    "full": "Microsoft 365 PowerShell administration assistant"
+  },
+  "description": {
+    "short": "Verified PowerShell commands for administering Microsoft 365.",
+    "full": "Answers Microsoft 365 PowerShell administration questions with exact, runnable commands for Exchange Online, Microsoft Teams, SharePoint Online and OneDrive, Microsoft Purview, and Microsoft Graph. Grounded in a knowledge base whose cmdlets and parameters were verified against installed modules and Microsoft Learn, so it reproduces working commands instead of plausible-looking ones. Every answer names the module, the connect cmdlet and the permission required. Destructive commands are flagged before they are given, and the agent establishes which operating system you use before recommending anything that only runs on Windows."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#0F6CBD",
+  "copilotAgents": {
+    "declarativeAgents": [
+      {
+        "id": "m365PowerShellAdmin",
+        "file": "declarativeAgent.json"
+      }
+    ]
+  },
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": []
+}

@@ -1,0 +1,474 @@
+Microsoft 365 PowerShell knowledge base — Microsoft Graph and Entra ID
+Scope of this document: Querying Graph correctly, users, groups, licensing, devices, sign-in and audit logs, applications and service principals, directory roles, Conditional Access, raw requests.
+`Microsoft.Graph` 2.39.0 — connect with `Connect-MgGraph -Scopes "User.Read.All","Group.ReadWrite.All" -NoWelcome`.
+Source: m365-kb/05-microsoft-graph.md (generated file — edit the source, not this)
+======================================================================
+
+`Microsoft.Graph` 2.39.0 — connect with `Connect-MgGraph -Scopes "User.Read.All","Group.ReadWrite.All" -NoWelcome`.
+
+## Mental model
+
+- The SDK is generated from the Graph REST API. One cmdlet = one endpoint: `Get-MgUser` is `GET /users`, `New-MgGroupMemberByRef` is `POST /groups/{id}/members/$ref`, `Get-MgUserLicenseDetail` is `GET /users/{id}/licenseDetails`.
+- `Microsoft.Graph` is a meta-module of ~40 submodules. `Microsoft.Graph.Authentication` is always required; the rest load on demand (`Microsoft.Graph.Users`, `.Groups`, `.Identity.DirectoryManagement`, `.Identity.SignIns`, `.Applications`, `.Reports`, `.Identity.Governance`).
+- `Get-MgUser` returns the API's default `$select` set only (id, displayName, mail, UPN, jobTitle, a few more). Everything else — `AssignedLicenses`, `SignInActivity`, `OnPremisesSyncEnabled`, `CreatedDateTime` — comes back `$null` until you ask for it with `-Property`.
+- Beta endpoints live in the separate `Microsoft.Graph.Beta` module with `Get-MgBeta*` naming. There is no `Get-MgProfile` / `Select-MgProfile` in v2 — that was v1.x.
+- Scopes are consent, not authorization: you still need the matching Entra role (User Administrator, Groups Administrator, Security Reader, Global Reader…) for the call to succeed.
+- `Connect-MgGraph` has **no** `-Interactive` switch — browser sign-in is the default.
+
+## Connection
+
+### Microsoft Graph and Entra ID — Connect with the scopes you need
+Command:
+    Connect-MgGraph -Scopes "User.ReadWrite.All","Group.ReadWrite.All","Organization.Read.All" -NoWelcome
+
+Scopes are accretive: re-running with new `-Scopes` adds to what is already consented, it does not replace.
+
+### Microsoft Graph and Entra ID — Verify the connection and see the scopes you actually have
+Command:
+    Get-MgContext | Select-Object Account,TenantId,Scopes
+
+### Microsoft Graph and Entra ID — Sign in on a machine with no browser
+Command:
+    Connect-MgGraph -Scopes "User.Read.All" -UseDeviceCode -NoWelcome
+
+### Microsoft Graph and Entra ID — Disconnect
+Command:
+    Disconnect-MgGraph
+
+### Microsoft Graph and Entra ID — Work around a hanging WAM sign-in on Windows
+Command:
+    Connect-MgGraph -UseDeviceCode
+
+WAM is on by default on Windows and **cannot be disabled** — `Set-MgGraphOption -DisableLoginByWAM` no longer has any effect. Device code is the fallback.
+
+## Discovery
+
+### Microsoft Graph and Entra ID — Find the cmdlet that calls a given API URI
+Command:
+    Find-MgGraphCommand -Uri "/users/{id}/licenseDetails" -Method GET | Select-Object Command,Module,Permissions
+
+### Microsoft Graph and Entra ID — Find the URI and permissions behind a cmdlet
+Command:
+    Find-MgGraphCommand -Command Get-MgAuditLogSignIn | Select-Object -ExpandProperty Permissions
+
+### Microsoft Graph and Entra ID — Find the permission that grants an operation
+Command:
+    Find-MgGraphPermission "AuditLog" -PermissionType Delegated | Select-Object Name,Description
+
+### Microsoft Graph and Entra ID — Use a beta endpoint
+Command:
+    Get-MgBetaUser -UserId user@contoso.com -Property DisplayName,EmployeeLeaveDateTime
+
+Beta is subject to change without notice; keep it out of scheduled jobs where a v1.0 equivalent exists.
+
+## Querying properly
+
+### Microsoft Graph and Entra ID — Return every object instead of the first page
+Command:
+    Get-MgUser -All -Property Id,DisplayName,UserPrincipalName,AccountEnabled
+
+Without `-All` you get one page (100 objects) and no warning.
+
+### Microsoft Graph and Entra ID — Get properties that are null by default
+Command:
+    Get-MgUser -UserId user@contoso.com -Property Id,DisplayName,UsageLocation,AssignedLicenses,OnPremisesSyncEnabled,CreatedDateTime
+
+`-Property` has the alias `-Select`; `-ExpandProperty` is `-Expand`, `-Sort` is `-OrderBy`, `-Top` is `-Limit`.
+
+### Microsoft Graph and Entra ID — Filter server-side
+Command:
+    Get-MgUser -All -Filter "department eq 'Finance' and accountEnabled eq true" -Property DisplayName,UserPrincipalName,Department
+
+### Microsoft Graph and Entra ID — Run an advanced query (endsWith, not, ne, empty collections)
+Command:
+    Get-MgUser -All -Filter "endsWith(mail,'@contoso.com')" -ConsistencyLevel eventual -CountVariable c -Property DisplayName,Mail
+
+`endsWith`, `not`, `ne`, `$search`, `$count` and filters on `signInActivity`/`extensionAttributes` all require **both** `-ConsistencyLevel eventual` and `-CountVariable`. Omit either and the filter is silently ignored or errors.
+
+### Microsoft Graph and Entra ID — Search across display name and mail
+Command:
+    Get-MgUser -Search '"displayName:Sales" OR "mail:Sales"' -ConsistencyLevel eventual -CountVariable c -All
+
+The search value needs inner double quotes inside outer single quotes.
+
+### Microsoft Graph and Entra ID — Cap results
+Command:
+    Get-MgAuditLogSignIn -Top 25
+
+`/auditLogs/signIns` supports only `$top`, `$filter` and `$skiptoken` — `-Sort` is silently ignored, but records already come back newest-first.
+
+### Microsoft Graph and Entra ID — Expand a relationship in one call
+Command:
+    Get-MgGroup -GroupId $groupId -ExpandProperty Members | Select-Object -ExpandProperty Members
+
+`$expand` on a directory relationship returns **at most 20** objects and does not page — use `Get-MgGroupMember -All` for the real membership.
+
+### Microsoft Graph and Entra ID — Tune the page size for large pulls
+Command:
+    Get-MgUser -All -PageSize 999 -Property Id,UserPrincipalName,AssignedLicenses
+
+### Microsoft Graph and Entra ID — Escape a quote inside a filter
+Command:
+    Get-MgUser -Filter "displayName eq 'O''Brien, Sean'"
+
+A single quote is escaped by doubling it, not by backslashing it.
+
+## Users
+
+### Microsoft Graph and Entra ID — Get a user with the properties you care about
+Command:
+    Get-MgUser -UserId user@contoso.com -Property DisplayName,UserPrincipalName,JobTitle,Department,UsageLocation,AccountEnabled
+
+### Microsoft Graph and Entra ID — Create a user
+Commands:
+    $pw = -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 16 | ForEach-Object { [char]$_ })
+    New-MgUser -DisplayName "Sean O'Brien" -UserPrincipalName user@contoso.com -MailNickname "user" -UsageLocation "GB" -AccountEnabled -PasswordProfile @{ Password = $pw; ForceChangePasswordNextSignIn = $true }
+
+`-UsageLocation` must be set before any license can be assigned.
+
+### Microsoft Graph and Entra ID — Update user attributes
+Command:
+    Update-MgUser -UserId user@contoso.com -JobTitle "Financial Analyst" -Department "Finance" -OfficeLocation "London"
+
+### Microsoft Graph and Entra ID — Block sign-in and kill existing sessions
+Command:
+    Update-MgUser -UserId user@contoso.com -AccountEnabled:$false; Revoke-MgUserSignInSession -UserId user@contoso.com
+
+Disabling alone leaves issued access tokens valid for their remaining lifetime — 60–90 minutes by default, up to 24–28 hours for CAE-capable clients — so revoking sessions is also required.
+
+### Microsoft Graph and Entra ID — Reset a password and force a change at next sign-in
+Commands:
+    $pw = -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 16 | ForEach-Object { [char]$_ })
+    Update-MgUser -UserId user@contoso.com -PasswordProfile @{ Password = $pw; ForceChangePasswordNextSignIn = $true }
+
+Needs `User-PasswordProfile.ReadWrite.All`; it fails against anyone holding a privileged role unless you hold one too.
+
+### Microsoft Graph and Entra ID — Set the manager
+Command:
+    Set-MgUserManagerByRef -UserId user@contoso.com -OdataId "https://graph.microsoft.com/v1.0/users/admin@contoso.com"
+
+### Microsoft Graph and Entra ID — Read the manager
+Command:
+    (Get-MgUserManager -UserId user@contoso.com).AdditionalProperties['userPrincipalName']
+
+### Microsoft Graph and Entra ID — Set and get the profile photo
+Command:
+    Set-MgUserPhotoContent -UserId user@contoso.com -InFile ./photo.jpg; Get-MgUserPhotoContent -UserId user@contoso.com -OutFile ./current.jpg
+
+### Microsoft Graph and Entra ID — Delete a user
+Command:
+    Remove-MgUser -UserId user@contoso.com
+
+### Microsoft Graph and Entra ID — List soft-deleted users
+Command:
+    Get-MgDirectoryDeletedItemAsUser -All | Select-Object DisplayName,UserPrincipalName,DeletedDateTime
+
+Deleted directory objects are recoverable for 30 days.
+
+### Microsoft Graph and Entra ID — Restore a deleted user
+Command:
+    Restore-MgDirectoryDeletedItem -DirectoryObjectId $deletedUserId
+
+### Microsoft Graph and Entra ID — Bulk-create users from CSV
+Commands:
+    Import-Csv ./newusers.csv | ForEach-Object {
+      $pw = -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 16 | ForEach-Object { [char]$_ })
+      New-MgUser -DisplayName $_.DisplayName -UserPrincipalName $_.UserPrincipalName -MailNickname $_.MailNickname `
+        -UsageLocation $_.UsageLocation -AccountEnabled -PasswordProfile @{ Password = $pw; ForceChangePasswordNextSignIn = $true }
+    }
+
+CSV headers: DisplayName, UserPrincipalName, MailNickname, UsageLocation.
+
+### Microsoft Graph and Entra ID — Find users who have not signed in for 90 days
+Command:
+    Get-MgUser -All -Property DisplayName,UserPrincipalName,SignInActivity -Filter "signInActivity/lastSignInDateTime le $((Get-Date).AddDays(-90).ToString('yyyy-MM-ddTHH:mm:ssZ'))" -ConsistencyLevel eventual -CountVariable c
+
+Requires Entra ID P1/P2 and `AuditLog.Read.All`. Misses accounts that have **never** signed in (blank `lastSignInDateTime`) — catch those with a second pass filtering on `-not $_.SignInActivity.LastSignInDateTime`. `signInActivity` cannot be combined with any other filterable property, and `-Top` is capped at 500 when you select it.
+
+## Groups
+
+### Microsoft Graph and Entra ID — Create a Microsoft 365 group
+Command:
+    New-MgGroup -DisplayName "Sales Team" -MailNickname "salesteam" -MailEnabled -SecurityEnabled:$false -GroupTypes "Unified"
+
+### Microsoft Graph and Entra ID — Create a security group
+Command:
+    New-MgGroup -DisplayName "Sales Team" -MailNickname "salesteam" -SecurityEnabled -MailEnabled:$false -GroupTypes @()
+
+### Microsoft Graph and Entra ID — Add a member
+Command:
+    New-MgGroupMemberByRef -GroupId $groupId -OdataId "https://graph.microsoft.com/v1.0/directoryObjects/$userId"
+
+### Microsoft Graph and Entra ID — Remove a member
+Command:
+    Remove-MgGroupMemberByRef -GroupId $groupId -DirectoryObjectId $userId
+
+### Microsoft Graph and Entra ID — Add and list owners
+Command:
+    New-MgGroupOwnerByRef -GroupId $groupId -OdataId "https://graph.microsoft.com/v1.0/users/admin@contoso.com"; Get-MgGroupOwnerAsUser -GroupId $groupId -All | Select-Object DisplayName,UserPrincipalName
+
+### Microsoft Graph and Entra ID — Create a dynamic membership group
+Commands:
+    New-MgGroup -DisplayName "Sales Team" -MailNickname "salesteam" -MailEnabled -SecurityEnabled:$false `
+      -GroupTypes "Unified","DynamicMembership" -MembershipRule '(user.department -eq "Sales")' -MembershipRuleProcessingState "On"
+
+Dynamic membership needs an Entra ID P1 licence per member.
+
+### Microsoft Graph and Entra ID — List members including nested groups
+Command:
+    Get-MgGroupTransitiveMember -GroupId $groupId -All | Select-Object Id,@{n='Type';e={$_.AdditionalProperties['@odata.type']}},@{n='Name';e={$_.AdditionalProperties['displayName']}}
+
+`Get-MgGroupMember` returns direct members only.
+
+### Microsoft Graph and Entra ID — List the groups a user is in, transitively
+Command:
+    Get-MgUserTransitiveMemberOf -UserId user@contoso.com -All | Select-Object -ExpandProperty AdditionalProperties | Select-Object displayName,'@odata.type'
+
+### Microsoft Graph and Entra ID — Find empty groups
+Command:
+    Get-MgGroup -All -Property Id,DisplayName | Where-Object { -not (Get-MgGroupMember -GroupId $_.Id -Top 1) } | Select-Object DisplayName,Id
+
+### Microsoft Graph and Entra ID — Find ownerless groups
+Command:
+    Get-MgGroup -All -Property Id,DisplayName | Where-Object { -not (Get-MgGroupOwner -GroupId $_.Id -Top 1) } | Select-Object DisplayName,Id
+
+## Licensing
+
+### Microsoft Graph and Entra ID — List subscriptions and free units
+Command:
+    Get-MgSubscribedSku -All | Select-Object SkuPartNumber,SkuId,@{n='Enabled';e={$_.PrepaidUnits.Enabled}},ConsumedUnits
+
+`SkuPartNumber` (e.g. `SPE_E3`, `ENTERPRISEPACK`) is the friendly-ish name; Microsoft publishes the product-name mapping in the "Product names and service plan identifiers" article.
+
+### Microsoft Graph and Entra ID — Assign a licence
+Command:
+    Set-MgUserLicense -UserId user@contoso.com -AddLicenses @{ SkuId = (Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq 'SPE_E3').SkuId } -RemoveLicenses @()
+
+`-RemoveLicenses @()` is mandatory even when you are only adding.
+
+### Microsoft Graph and Entra ID — Remove a licence
+Command:
+    Set-MgUserLicense -UserId user@contoso.com -AddLicenses @() -RemoveLicenses @((Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq 'SPE_E3').SkuId)
+
+### Microsoft Graph and Entra ID — Disable one service plan inside a SKU
+Commands:
+    $sku = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq 'SPE_E3'
+    $off = $sku.ServicePlans | Where-Object ServicePlanName -in ('YAMMER_ENTERPRISE','SWAY') | Select-Object -ExpandProperty ServicePlanId
+    Set-MgUserLicense -UserId user@contoso.com -AddLicenses @(@{ SkuId = $sku.SkuId; DisabledPlans = $off }) -RemoveLicenses @()
+
+`DisabledPlans` is absolute: any plan you omit is re-enabled, so merge with the user's existing disabled plans first if you are only adding one.
+
+### Microsoft Graph and Entra ID — See what a user is licensed for and where it came from
+Command:
+    Get-MgUserLicenseDetail -UserId user@contoso.com | Select-Object SkuPartNumber; (Get-MgUser -UserId user@contoso.com -Property LicenseAssignmentStates).LicenseAssignmentStates | Select-Object SkuId,AssignedByGroup,State,Error
+
+A non-null `AssignedByGroup` means group-based licensing — removing it directly will fail.
+
+### Microsoft Graph and Entra ID — Inspect group-based licensing
+Command:
+    Get-MgGroup -All -Property Id,DisplayName,AssignedLicenses | Where-Object { $_.AssignedLicenses } | Select-Object DisplayName,@{n='Skus';e={$_.AssignedLicenses.SkuId -join ','}}
+
+### Microsoft Graph and Entra ID — Export a licence report for every user
+Commands:
+    $skus = Get-MgSubscribedSku -All
+    Get-MgUser -All -PageSize 999 -Property DisplayName,UserPrincipalName,AccountEnabled,AssignedLicenses |
+      Select-Object DisplayName,UserPrincipalName,AccountEnabled,
+        @{n='Licenses';e={ ($_.AssignedLicenses.SkuId | ForEach-Object { $id = $_; ($skus | Where-Object SkuId -eq $id).SkuPartNumber }) -join ';' }} |
+      Export-Csv ./license-report.csv -NoTypeInformation
+
+## Devices
+
+### Microsoft Graph and Entra ID — List devices
+Command:
+    Get-MgDevice -All -Property DisplayName,OperatingSystem,OperatingSystemVersion,TrustType,ApproximateLastSignInDateTime,AccountEnabled
+
+### Microsoft Graph and Entra ID — Find stale devices
+Command:
+    Get-MgDevice -All -ConsistencyLevel eventual -CountVariable c -Filter "approximateLastSignInDateTime le $((Get-Date).AddDays(-180).ToString('yyyy-MM-ddTHH:mm:ssZ'))" -Property DisplayName,OperatingSystem,ApproximateLastSignInDateTime
+
+### Microsoft Graph and Entra ID — List devices registered to a user
+Command:
+    Get-MgUserRegisteredDevice -UserId user@contoso.com -All | Select-Object -ExpandProperty AdditionalProperties | Select-Object displayName,operatingSystem
+
+### Microsoft Graph and Entra ID — Retrieve a BitLocker recovery key
+Commands:
+    Get-MgInformationProtectionBitlockerRecoveryKey -All | Select-Object Id,DeviceId,CreatedDateTime
+    Get-MgInformationProtectionBitlockerRecoveryKey -BitlockerRecoveryKeyId $keyId -Property "key"
+
+The key value is only returned when you explicitly `-Property "key"`; needs `BitlockerKey.Read.All` and Global/Cloud Device/Intune Administrator or Helpdesk Administrator.
+
+## Sign-in and audit logs
+
+### Microsoft Graph and Entra ID — Read recent sign-ins
+Command:
+    Get-MgAuditLogSignIn -Filter "createdDateTime ge $((Get-Date).AddDays(-1).ToString('yyyy-MM-ddTHH:mm:ssZ'))" -Top 50 | Select-Object CreatedDateTime,UserPrincipalName,AppDisplayName,IPAddress,@{n='Error';e={$_.Status.ErrorCode}}
+
+### Microsoft Graph and Entra ID — List failed sign-ins for one user
+Command:
+    Get-MgAuditLogSignIn -Filter "userPrincipalName eq 'user@contoso.com' and status/errorCode ne 0" -Top 50 | Select-Object CreatedDateTime,AppDisplayName,IPAddress,@{n='Reason';e={$_.Status.FailureReason}}
+
+### Microsoft Graph and Entra ID — Search the directory audit log
+Command:
+    Get-MgAuditLogDirectoryAudit -All -Filter "activityDisplayName eq 'Add member to group' and activityDateTime ge $((Get-Date).AddDays(-7).ToString('yyyy-MM-ddTHH:mm:ssZ'))" | Select-Object ActivityDateTime,ActivityDisplayName,@{n='By';e={$_.InitiatedBy.User.UserPrincipalName}}
+
+### Microsoft Graph and Entra ID — List risky users
+Command:
+    Get-MgRiskyUser -All -Filter "riskLevel eq 'high' and riskState ne 'dismissed'" | Select-Object UserPrincipalName,RiskLevel,RiskState,RiskLastUpdatedDateTime
+
+Needs `IdentityRiskyUser.Read.All` and Entra ID P2.
+
+## Applications and service principals
+
+### Microsoft Graph and Entra ID — List app registrations
+Command:
+    Get-MgApplication -All -Property DisplayName,AppId,Id,SignInAudience,CreatedDateTime | Sort-Object DisplayName
+
+### Microsoft Graph and Entra ID — Find secrets and certificates expiring in the next 60 days
+Commands:
+    Get-MgApplication -All -Property DisplayName,AppId,PasswordCredentials,KeyCredentials |
+      ForEach-Object { $a = $_; @($a.PasswordCredentials) + @($a.KeyCredentials) |
+        Where-Object { $_ -and $_.EndDateTime -lt (Get-Date).ToUniversalTime().AddDays(60) -and $_.EndDateTime -gt (Get-Date).ToUniversalTime() } |
+        Select-Object @{n='App';e={$a.DisplayName}},@{n='AppId';e={$a.AppId}},DisplayName,EndDateTime } |
+      Sort-Object EndDateTime
+
+### Microsoft Graph and Entra ID — List enterprise apps with admin-consented delegated permissions
+Command:
+    Get-MgServicePrincipal -All -Filter "servicePrincipalType eq 'Application'" -Property Id,DisplayName,AppId | ForEach-Object { $sp = $_; Get-MgServicePrincipalOauth2PermissionGrant -ServicePrincipalId $sp.Id -All | Where-Object ConsentType -eq 'AllPrincipals' | Select-Object @{n='App';e={$sp.DisplayName}},ConsentType,Scope }
+
+### Microsoft Graph and Entra ID — List application (app-only) permissions granted to a service principal
+Command:
+    Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $spId -All | Select-Object ResourceDisplayName,AppRoleId,CreatedDateTime
+
+## Directory roles
+
+### Microsoft Graph and Entra ID — List activated roles
+Command:
+    Get-MgDirectoryRole -All | Select-Object DisplayName,Id,RoleTemplateId | Sort-Object DisplayName
+
+Only roles that have ever had a member are activated and returned here.
+
+### Microsoft Graph and Entra ID — List every Global Administrator
+Command:
+    Get-MgDirectoryRoleMemberAsUser -DirectoryRoleId (Get-MgDirectoryRoleByRoleTemplateId -RoleTemplateId "62e90394-69f5-4237-9190-012177145e10").Id -All | Select-Object DisplayName,UserPrincipalName
+
+### Microsoft Graph and Entra ID — Assign a role
+Command:
+    New-MgDirectoryRoleMemberByRef -DirectoryRoleId $roleId -OdataId "https://graph.microsoft.com/v1.0/directoryObjects/$userId"
+
+### Microsoft Graph and Entra ID — Remove a role assignment
+Command:
+    Remove-MgDirectoryRoleMemberDirectoryObjectByRef -DirectoryRoleId $roleId -DirectoryObjectId $userId
+
+### Microsoft Graph and Entra ID — Read PIM eligible role assignments
+Command:
+    Get-MgRoleManagementDirectoryRoleEligibilitySchedule -All -ExpandProperty "principal,roleDefinition" | Select-Object @{n='Who';e={$_.Principal.AdditionalProperties['displayName']}},@{n='Role';e={$_.RoleDefinition.DisplayName}},Status
+
+Requires `RoleEligibilitySchedule.Read.Directory` and Entra ID P2.
+
+## Conditional Access
+
+### Microsoft Graph and Entra ID — Inventory the policies
+Command:
+    Get-MgIdentityConditionalAccessPolicy -All | Select-Object DisplayName,State,Id,ModifiedDateTime | Sort-Object State,DisplayName
+
+Needs `Policy.Read.All`.
+
+### Microsoft Graph and Entra ID — Export one policy as JSON for review or diffing
+Command:
+    Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $policyId | ConvertTo-Json -Depth 10 | Set-Content ./ca-policy.json
+
+### Microsoft Graph and Entra ID — List named locations
+Command:
+    Get-MgIdentityConditionalAccessNamedLocation -All | Select-Object DisplayName,Id,@{n='Type';e={$_.AdditionalProperties['@odata.type']}}
+
+## Mail and calendar
+
+### Microsoft Graph and Entra ID — Send mail as a user
+Command:
+    Send-MgUserMail -UserId user@contoso.com -SaveToSentItems -Message @{ Subject = "Maintenance window"; Body = @{ ContentType = "Text"; Content = "Patching starts at 22:00 UTC." }; ToRecipients = @(@{ EmailAddress = @{ Address = "admin@contoso.com" } }) }
+
+Delegated `Mail.Send` only lets you send as yourself; sending as somebody else needs application permission plus an application access policy.
+
+### Microsoft Graph and Entra ID — Read the newest messages in a mailbox
+Command:
+    Get-MgUserMessage -UserId user@contoso.com -Top 10 -Sort "receivedDateTime DESC" -Property Subject,ReceivedDateTime,From,IsRead
+
+### Microsoft Graph and Entra ID — Read calendar events in a window
+Command:
+    Get-MgUserCalendarView -UserId user@contoso.com -StartDateTime "2026-09-01T00:00:00Z" -EndDateTime "2026-09-30T23:59:59Z" -All | Select-Object Subject,Start,End,Organizer
+
+For mailbox configuration — quotas, permissions, forwarding, litigation hold, retention, transport rules — use Exchange Online cmdlets instead; Graph exposes item data, not mailbox administration.
+
+## Raw requests
+
+### Microsoft Graph and Entra ID — Call an endpoint that has no cmdlet
+Command:
+    Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/user@contoso.com/mailboxSettings" -OutputType PSObject
+
+Default `-OutputType` is a hashtable; `PSObject` gives you dotted property access.
+
+### Microsoft Graph and Entra ID — Page a raw request manually
+Commands:
+    $uri = "v1.0/users?`$select=displayName,userPrincipalName&`$top=999"
+    while ($uri) { $r = Invoke-MgGraphRequest -Method GET -Uri $uri -OutputType PSObject; $r.value; $uri = $r.'@odata.nextLink' }
+
+`Invoke-MgGraphRequest` does not follow `@odata.nextLink` for you.
+
+### Microsoft Graph and Entra ID — POST a body
+Command:
+    Invoke-MgGraphRequest -Method POST -Uri "v1.0/groups/$groupId/members/`$ref" -Body @{ "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$userId" }
+
+### Microsoft Graph and Entra ID — Combine calls with JSON batching
+Commands:
+    $body = @{ requests = @(
+      @{ id = "1"; method = "GET"; url = "/users/user@contoso.com?`$select=displayName,usageLocation" },
+      @{ id = "2"; method = "GET"; url = "/users/user@contoso.com/licenseDetails" }
+    ) }
+    (Invoke-MgGraphRequest -Method POST -Uri "v1.0/`$batch" -Body $body -OutputType PSObject).responses | Select-Object id,status
+
+Max 20 requests per batch; each is throttled individually and the batch itself still returns 200 when members fail.
+
+## Errors, throttling, permissions
+
+### Microsoft Graph and Entra ID — Raise the SDK's automatic retry behaviour
+Command:
+    Set-MgRequestContext -MaxRetry 10 -RetryDelay 5 -RetriesTimeLimit 300
+
+Applies to 429 and 5xx; check current values with `Get-MgRequestContext`.
+
+### Microsoft Graph and Entra ID — See the real error message from a failed call
+Command:
+    try { Get-MgUser -UserId nobody@contoso.com -ErrorAction Stop } catch { $_.Exception.Message; $_.ErrorDetails.Message }
+
+`$_.ErrorDetails.Message` holds the Graph JSON error body — that is where the useful `code` and `message` live.
+
+### Microsoft Graph and Entra ID — Fix a "Insufficient privileges" / consent error
+Command:
+    Get-MgContext | Select-Object -ExpandProperty Scopes; Find-MgGraphCommand -Command Get-MgAuditLogSignIn | Select-Object -ExpandProperty Permissions
+
+Compare the two, then reconnect with the missing scope added. If consent itself is refused, a Global Administrator has to approve the "Microsoft Graph Command Line Tools" app (id `14d82eec-204b-4c2f-b7e8-296a70dab67e`).
+
+### Microsoft Graph and Entra ID — Throttle bulk writes yourself
+Command:
+    Import-Csv ./users.csv | ForEach-Object { Update-MgUser -UserId $_.UserPrincipalName -Department $_.Department; Start-Sleep -Milliseconds 200 }
+
+## Gotchas
+
+- No `-All` means one page (100 objects) and no warning that there is more.
+- `Get-MgUser` silently returns `$null` for anything outside the default property set — `AssignedLicenses`, `SignInActivity`, `CreatedDateTime`, `OnPremisesSyncEnabled` all need `-Property`.
+- Advanced filters (`endsWith`, `not`, `ne`, `$search`, `$count`, `signInActivity`, `extensionAttributes`) need `-ConsistencyLevel eventual` **and** `-CountVariable` together; supply only one and the query fails or quietly ignores the filter.
+- Filters are OData, not PowerShell: `-Filter "displayName eq 'Sales'"`, single quotes doubled to escape, ISO 8601 UTC timestamps, and `-Filter` is case-sensitive on values.
+- `Connect-MgGraph -Interactive` is not a thing. Browser sign-in is the default parameter set.
+- Scopes are consent, not permission. Having `User.ReadWrite.All` consented still fails without the User Administrator (or higher) role.
+- Two versions of `Microsoft.Graph.Authentication` side by side produce bogus "Authentication needed. Please call Connect-MgGraph." errors on later cmdlets — keep exactly one (`Get-InstalledModule Microsoft.Graph.Authentication -AllVersions`).
+- `Set-MgUserLicense -AddLicenses`/`-RemoveLicenses` are both mandatory; pass `@()` for the one you are not using.
+- `DisabledPlans` replaces the whole disabled set — omitting a plan silently re-enables it.
+- Licences assigned through a group cannot be removed from the user directly; check `LicenseAssignmentStates.AssignedByGroup` first.
+- `Get-MgGroupMember` is direct members only. Nested groups need `Get-MgGroupTransitiveMember`.
+- Directory-object cmdlets return a `DirectoryObject` whose real fields sit in `.AdditionalProperties` — `Select-Object DisplayName` on `Get-MgGroupMember` output returns blanks. Use the `*AsUser` / `*AsGroup` variants instead.
+- `Get-MgDirectoryRole` lists only activated roles; a role nobody has ever held will not appear. Use `Get-MgDirectoryRoleByRoleTemplateId` when you need one by template.
+- `Invoke-MgGraphRequest` does not follow `@odata.nextLink`, and `$` in the URI must be backtick-escaped in double-quoted PowerShell strings.
+- 429s are retried automatically but only `MaxRetry` times; bulk loops still need pacing, and batched requests are never auto-retried.
+- Graph is eventually consistent: a user or group created a second ago may not appear in a filtered list yet.
+- Beta cmdlets (`Get-MgBeta*`) come from a separate module and can change without notice, so they are a poor basis for scheduled jobs where v1.0 covers the call.
+- Disconnect with `Disconnect-MgGraph`; it does not affect Exchange, Teams, PnP or SPO sessions, which each need their own disconnect.

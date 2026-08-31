@@ -1,0 +1,93 @@
+{
+  "_comment": "Curated question/answer pairs for facts that must never be wrong. Merged into declarativeAgent.json by build-agent.py. Sourced from the verified Gotchas in m365-kb/ and from defects found during the KB audit.",
+  "answers": [
+    {
+      "question": "Can I run Connect-IPPSSession on macOS or Linux?",
+      "answer": "No. Connect-IPPSSession works in Windows PowerShell 5.1 and in PowerShell 7 on Windows only. It is unavailable in PowerShell 7 on macOS and Linux, so all Microsoft Purview / Security and Compliance PowerShell work requires a Windows host."
+    },
+    {
+      "question": "Can I install the SharePoint Online Management Shell on a Mac?",
+      "answer": "No. Microsoft.Online.SharePoint.PowerShell is Windows-only and will not install on macOS or Linux. Use PnP.PowerShell instead; the *-PnPTenant* cmdlets cover most of what the SPO module does, and Microsoft Graph covers the rest."
+    },
+    {
+      "question": "Does Update-DistributionGroupMember add members to a group?",
+      "answer": "No. Update-DistributionGroupMember REPLACES the entire membership on every call. Looping it over chunks leaves only the last chunk in the group. Seed the group with one Update-DistributionGroupMember call, then add remaining members individually with Add-DistributionGroupMember."
+    },
+    {
+      "question": "How do I offboard a leaver and remove their licence?",
+      "answer": "Apply the hold first and remove the licence last, and pick one of two mutually exclusive endings. Either keep the account as a shared-mailbox anchor, in which case you must KEEP an Exchange Online Plan 2 licence because a shared mailbox on litigation hold is not licence-free; or delete the user account after the hold is in place, which turns the held mailbox into an inactive mailbox that needs no licence. A mailbox only becomes inactive when the account or mailbox is deleted; disabling it and converting it to shared never does. An unheld mailbox is purged 30 days after delicensing."
+    },
+    {
+      "question": "Why is my Get-SPOSite report showing the wrong external sharing setting?",
+      "answer": "Get-SPOSite deliberately leaves SharingCapability and several other properties unpopulated whenever -Limit or -Filter is used, so a bulk report shows a default value rather than each site's real setting. Read the real value with Get-PnPTenantSite -Detailed, or re-query each site individually with Get-SPOSite -Identity <url>."
+    },
+    {
+      "question": "Which module do I use for users, groups and licensing?",
+      "answer": "Microsoft Graph (the Microsoft.Graph module). Identity, users, groups, licensing, devices, sign-in logs, app registrations and directory roles are all Graph work. Use Exchange Online cmdlets for mailbox and mail-flow configuration, PnP.PowerShell for SharePoint site contents, and MicrosoftTeams for Teams objects."
+    },
+    {
+      "question": "Are MSOnline and AzureAD still supported?",
+      "answer": "No. MSOnline and AzureAD/AzureADPreview are retired and unlisted on the PowerShell Gallery, and the underlying Azure AD Graph API is gone, so they fail rather than warn. Replace Get-MsolUser and Connect-AzureAD with Microsoft.Graph, or with Microsoft.Entra where Connect-Entra is an alias for Connect-MgGraph."
+    },
+    {
+      "question": "Why does PnP.PowerShell ask for a ClientId?",
+      "answer": "PnP.PowerShell 3.x requires your own Entra ID app registration; the shared PnP Management Shell multi-tenant app was removed on 9 September 2024. Register one with Register-PnPEntraIDAppForInteractiveLogin, then pass -ClientId on connect, or set the ENTRAID_APP_ID environment variable. This applies only to PnP; the Exchange Online, Teams, SPO and Graph connect cmdlets do not take -ClientId."
+    },
+    {
+      "question": "Why is signInActivity empty when I query users in Graph?",
+      "answer": "signInActivity is never returned by default. Request it with -Property SignInActivity, hold the AuditLog.Read.All scope, and have an Entra ID P1 or P2 licence. Selecting or filtering on it also caps the page size at 500. Filtering on lastSignInDateTime also excludes accounts that have never signed in, because that property is blank for them."
+    },
+    {
+      "question": "How far back can Get-MessageTraceV2 search?",
+      "answer": "Get-MessageTraceV2 searches the last 90 days of message data, returning a maximum of 10 days per query, so page the date range. For anything older than 90 days use Start-HistoricalSearch."
+    },
+    {
+      "question": "Why does my Search-UnifiedAuditLog export have an empty timestamp column?",
+      "answer": "The record property is CreationDate, not CreationTime. CreationTime exists only inside the nested AuditData JSON. Select CreationDate when exporting."
+    },
+    {
+      "question": "How do I page through all results in Search-UnifiedAuditLog?",
+      "answer": "Use -SessionCommand ReturnLargeSet with a stable -SessionId in a loop. It reaches 50,000 records per session but returns unsorted, duplicate-prone pages, so de-duplicate on record identity rather than on CreationDate, which would drop genuinely distinct events sharing a timestamp. Mixing ReturnLargeSet and ReturnNextPreviewPage on one SessionId caps the result at 10,000."
+    },
+    {
+      "question": "Why does my Graph filter with $count fail in PowerShell?",
+      "answer": "A backslash is not a PowerShell escape character, so \"assignedLicenses/\\$count eq 0\" is sent to Graph as assignedLicenses/\\ eq 0. Escape the dollar sign with a backtick inside double quotes, or single-quote the whole filter: 'assignedLicenses/$count eq 0'. Filters using $count, endsWith, not or search also need -ConsistencyLevel eventual and -CountVariable."
+    },
+    {
+      "question": "Why does Get-MgGroup -ExpandProperty Members return only some members?",
+      "answer": "Expanding a directory-object relationship returns at most 20 objects and does not page. Use Get-MgGroupMember -All, or Get-MgGroupTransitiveMember -All, for the full membership."
+    },
+    {
+      "question": "Can I sort Get-MgAuditLogSignIn results?",
+      "answer": "No. The /auditLogs/signIns endpoint supports only $top, $filter and $skiptoken, so -Sort is silently ignored. Records are already returned newest-first."
+    },
+    {
+      "question": "Why is my mailbox report missing users?",
+      "answer": "Every Exchange Online recipient cmdlet defaults to a ResultSize of 1000 and truncates silently. Pass -ResultSize Unlimited for inventories. The equivalents elsewhere are -All in Microsoft Graph, -Limit All for Get-SPOSite, and -PageSize for Get-PnPListItem on lists over the 5,000-item view threshold."
+    },
+    {
+      "question": "Can I assign a Teams policy to a group by name?",
+      "answer": "No. The -Group parameter on the Grant-Cs*Policy cmdlets accepts a group object ID, SIP address or email address; a display name fails. The same applies to -Groups on Update-M365TeamsApp, which takes group object IDs."
+    },
+    {
+      "question": "Can I reuse the name of a deleted Teams channel?",
+      "answer": "No. A deleted channel's name can never be reused, even after the 30-day restore window. This is by design, for information protection. Restoring a deleted channel is a Teams client or admin centre action, not a cmdlet."
+    },
+    {
+      "question": "Which Graph audit log query cmdlets exist?",
+      "answer": "Only the beta ones. The Graph PowerShell SDK ships New-MgBetaSecurityAuditLogQuery, Get-MgBetaSecurityAuditLogQuery and Get-MgBetaSecurityAuditLogQueryRecord in Microsoft.Graph.Beta.Security. There is no v1.0 Get-MgSecurityAuditLogQuery. The query is asynchronous, so poll Status until it reads succeeded before reading records."
+    },
+    {
+      "question": "Why is my script that builds a big report so slow?",
+      "answer": "Two usual causes. First, $array += $item rebuilds the whole array on every iteration, which is quadratic and the common reason a large script never finishes; use a List[object] or the pipeline. Second, client-side Where-Object enumerates the whole tenant before filtering; use the cmdlet's server-side -Filter instead. Also avoid per-object cmdlet calls inside loops, and cache lookups in a hashtable."
+    },
+    {
+      "question": "Why does my CSV export contain Microsoft.PowerShell.Commands.Internal.Format entries?",
+      "answer": "A Format-Table or Format-List result was piped into Export-Csv or ConvertTo-Json. Those cmdlets emit format objects, not data. Pipe the original objects instead, and use Select-Object to choose columns."
+    },
+    {
+      "question": "Does a shared mailbox need a licence?",
+      "answer": "Usually not, but there are three exceptions: a mailbox over 50 GB, one with an archive enabled, or one on litigation hold. A shared mailbox on litigation hold requires an Exchange Online Plan 2 licence. Check all three before removing a licence."
+    }
+  ]
+}

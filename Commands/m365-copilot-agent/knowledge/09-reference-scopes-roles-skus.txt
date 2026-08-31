@@ -1,0 +1,150 @@
+Microsoft 365 PowerShell knowledge base — Reference: modules, cmdlet map, scopes, roles, licence SKUs
+Scope of this document: Which module manages what, which cmdlet to reach for by task, least-privilege Graph delegated scopes, admin roles per workload, licence SKU part numbers.
+Lookup tables for the whole KB. Nothing here runs without a connection first — see the module table below.
+Source: m365-kb/08-reference.md (generated file — edit the source, not this)
+======================================================================
+
+## Modules
+
+- ExchangeOnlineManagement 3.10.1 manages Exchange Online, mailboxes, transport, EOP. Connect with `Connect-ExchangeOnline -UserPrincipalName admin@contoso.onmicrosoft.com -ShowBanner:$false`. Disconnect or verify with `Disconnect-ExchangeOnline -Confirm:$false` / `Get-ConnectionInformation`.
+- ExchangeOnlineManagement 3.10.1 (same package) manages Purview: labels, DLP, retention, eDiscovery. Connect with `Connect-IPPSSession -UserPrincipalName admin@contoso.onmicrosoft.com`. Disconnect or verify with `Disconnect-ExchangeOnline -Confirm:$false` / `Get-ConnectionInformation`.
+- MicrosoftTeams 7.9.0 manages Teams, Teams Phone, all `Cs*` cmdlets. Connect with `Connect-MicrosoftTeams`. Disconnect or verify with `Disconnect-MicrosoftTeams` / `Get-CsTenant`.
+- Microsoft.Online.SharePoint.PowerShell 16.0.27515.12000 manages SPO/OneDrive tenant + sites (Windows only). Connect with `Connect-SPOService -Url https://contoso-admin.sharepoint.com`. Disconnect or verify with `Disconnect-SPOService` / `Get-SPOTenant`.
+- PnP.PowerShell 3.4.1 manages Site content: lists, files, permissions. Connect with `Connect-PnPOnline -Url "https://contoso.sharepoint.com" -Interactive -ClientId <your-app-client-id>`. Disconnect or verify with `Disconnect-PnPOnline` / `Get-PnPConnection`.
+- Microsoft.Graph 2.39.0 manages Entra ID, users, groups, licences, reports. Connect with `Connect-MgGraph -Scopes "User.Read.All","Group.ReadWrite.All" -NoWelcome`. Disconnect or verify with `Disconnect-MgGraph` / `Get-MgContext`.
+
+PnP is the only one that requires your own Entra app registration. `Connect-MgGraph` has no `-Interactive` switch — browser sign-in is the default. Beta Graph cmdlets live in `Microsoft.Graph.Beta` as `Get-MgBeta*`.
+
+## Cmdlet noun map — Exchange Online
+
+- To List mailboxes in bulk — use `Get-EXOMailbox` (`Get-Mailbox` for writes/rare properties).
+- To See size, item count, last logon — use `Get-EXOMailboxStatistics`.
+- To Find any recipient type at once — use `Get-EXORecipient`, `Get-Recipient`.
+- To Check who has access to a mailbox — use `Get-EXOMailboxPermission`, `Get-EXORecipientPermission` (SendAs), `Get-EXOMailboxFolderPermission`.
+- To Grant access — use `Add-MailboxPermission`, `Add-RecipientPermission`, `Set-Mailbox -GrantSendOnBehalfTo`.
+- To Convert to shared, set forwarding, litigation hold — use `Set-Mailbox`.
+- To Distribution groups / M365 group mailboxes — use `Get-DistributionGroup`, `Get-DistributionGroupMember`, `Get-UnifiedGroup`, `Get-UnifiedGroupLinks`.
+- To Rooms and equipment — use `Get-Mailbox -RecipientTypeDetails RoomMailbox,EquipmentMailbox`, `Get-CalendarProcessing`, `Get-Place`.
+- To Trace a message — use `Get-MessageTraceV2`, then `Get-MessageTraceDetailV2` (90 days of data, max 10 days per query — page the range); older than 90 days: `Start-HistoricalSearch`.
+- To Mail flow rules and connectors — use `Get-TransportRule`, `Get-InboundConnector`, `Get-OutboundConnector`, `Get-AcceptedDomain`, `Get-RemoteDomain`.
+- To Anti-spam / anti-phish / Safe Links — use `Get-HostedContentFilterPolicy`, `Get-AntiPhishPolicy`, `Get-SafeLinksPolicy`, `Get-QuarantineMessage`.
+- To Suspicious inbox rules — use `Get-InboxRule -Mailbox user@contoso.com`.
+- To Protocols, OWA/ActiveSync, mobile devices — use `Get-CASMailbox`, `Get-MobileDevice`, `Get-MobileDeviceStatistics`.
+- To Tenant-wide settings — use `Get-OrganizationConfig`, `Set-OrganizationConfig`.
+- To Search the unified audit log — use `Search-UnifiedAuditLog` (EXO, not Purview).
+
+## Cmdlet noun map — Purview (Connect-IPPSSession)
+
+- To Content search end to end — use `New-ComplianceSearch`, `Start-ComplianceSearch`, `Get-ComplianceSearch`, `New-ComplianceSearchAction`.
+- To eDiscovery cases and holds — use `Get-ComplianceCase`, `New-CaseHoldPolicy`, `New-CaseHoldRule`.
+- To Retention — use `Get-RetentionCompliancePolicy`, `Get-RetentionComplianceRule`.
+- To Sensitivity labels — use `Get-Label`, `Get-LabelPolicy`.
+- To DLP — use `Get-DlpCompliancePolicy`, `Get-DlpComplianceRule`, `Get-DlpSensitiveInformationType`.
+- To Purview RBAC — use `Get-RoleGroup`, `Add-RoleGroupMember`.
+
+## Cmdlet noun map — Teams
+
+- To List teams, members, channels — use `Get-Team`, `Get-TeamUser`, `Get-TeamChannel`.
+- To Per-user voice/licence/policy state — use `Get-CsOnlineUser`.
+- To Policies and assignment — use `Get-CsTeamsMeetingPolicy`, `Get-CsTeamsMessagingPolicy`, `Get-CsTeamsCallingPolicy`, `Grant-Cs*Policy -Identity user@contoso.com`.
+- To Phone numbers — use `Get-CsPhoneNumberAssignment`, `Set-CsPhoneNumberAssignment`, `Remove-CsPhoneNumberAssignment`.
+- To Voice routing (Direct Routing) — use `Get-CsOnlineVoiceRoutingPolicy`, `Get-CsOnlinePSTNGateway`, `Get-CsOnlineVoiceRoute`.
+- To Auto attendants and call queues — use `Get-CsAutoAttendant`, `Get-CsCallQueue`, `Get-CsOnlineApplicationInstance`.
+- To Federation / external access — use `Get-CsTenantFederationConfiguration`, `Get-CsExternalAccessPolicy`.
+- To Confirm the tenant you are in — use `Get-CsTenant`.
+
+## Cmdlet noun map — SharePoint / OneDrive
+
+- To List sites — SPO module: `Get-SPOSite -Limit All`. PnP: `Get-PnPTenantSite`.
+- To Site storage / quota / sharing — SPO module: `Get-SPOSite`, `Set-SPOSite`. PnP: `Set-PnPTenantSite`.
+- To Site collection admins — SPO module: `Set-SPOUser -IsSiteCollectionAdmin $true`. PnP: `Get-PnPSiteCollectionAdmin`, `Add-PnPSiteCollectionAdmin`.
+- To OneDrive sites — SPO module: `Get-SPOSite -IncludePersonalSite $true -Limit All -Filter "Url -like '-my.sharepoint.com/personal/'"`. PnP: `Get-PnPTenantSite -IncludeOneDriveSites`.
+- To Tenant sharing policy — SPO module: `Get-SPOTenant`, `Set-SPOTenant`. PnP: `Get-PnPTenant`, `Set-PnPTenant`.
+- To Lists, libraries, items, files — SPO module: —. PnP: `Get-PnPList`, `Get-PnPListItem`, `Get-PnPFile`, `Get-PnPFolder`.
+- To Permissions on a site/web — SPO module: `Get-SPOUser`, `Get-SPOSiteGroup`. PnP: `Get-PnPGroup`, `Get-PnPGroupMember`.
+- To Deleted sites and recycle bin — SPO module: `Get-SPODeletedSite`, `Restore-SPODeletedSite`. PnP: `Get-PnPRecycleBinItem`.
+- To External users — SPO module: `Get-SPOExternalUser`. PnP: `Get-PnPExternalUser`.
+
+## Cmdlet noun map — Entra / Graph
+
+- To Users — use `Get-MgUser`, `New-MgUser`, `Update-MgUser`, `Remove-MgUser`.
+- To Groups and membership — use `Get-MgGroup`, `Get-MgGroupMember`, `New-MgGroupMember`, `Get-MgGroupOwner`.
+- To A user's group/role memberships — use `Get-MgUserMemberOf`, `Get-MgUserTransitiveMemberOf`.
+- To Licences — use `Get-MgSubscribedSku`, `Get-MgUserLicenseDetail`, `Set-MgUserLicense`.
+- To Directory roles — use `Get-MgDirectoryRole`, `Get-MgDirectoryRoleMember`.
+- To Sign-in and audit logs — use `Get-MgAuditLogSignIn`, `Get-MgAuditLogDirectoryAudit`.
+- To MFA / auth method registration — use `Get-MgUserAuthenticationMethod`, `Get-MgReportAuthenticationMethodUserRegistrationDetail`.
+- To Conditional Access — use `Get-MgIdentityConditionalAccessPolicy`.
+- To Apps and service principals — use `Get-MgApplication`, `Get-MgServicePrincipal`.
+- To Devices — use `Get-MgDevice`.
+- To Usage reports — use `Get-MgReportOffice365ActiveUserDetail` and the other `Get-MgReport*`.
+- To Kill a user's sessions — use `Revoke-MgUserSignInSession`.
+- To Tenant and domains — use `Get-MgOrganization`, `Get-MgDomain`.
+
+### Reference: modules, cmdlet map, scopes, roles, licence SKUs — Find the cmdlet and permission for any Graph API
+Command:
+    Find-MgGraphCommand -Uri '/users/{id}/licenseDetails' -Method GET | Select-Object -First 1 Command,Permissions
+
+`Find-MgGraphPermission mailbox -PermissionType Delegated` goes the other way, from keyword to scope name.
+
+## Graph delegated scopes by task
+
+Scopes are consent only. You also need the Entra role in the third column, or the call still returns 403.
+
+- For Read user objects — least-privilege delegated scope `User.Read.All`; Entra role usually needed: Directory Readers / Global Reader.
+- For Create, update, disable users — least-privilege delegated scope `User.ReadWrite.All`; Entra role usually needed: User Administrator.
+- For Reset a password — least-privilege delegated scope `User-PasswordProfile.ReadWrite.All`; Entra role usually needed: Helpdesk / Password Administrator.
+- For Read groups — least-privilege delegated scope `Group.Read.All`; Entra role usually needed: Directory Readers.
+- For Change group membership — least-privilege delegated scope `GroupMember.ReadWrite.All`; Entra role usually needed: Groups Administrator.
+- For Create / delete groups — least-privilege delegated scope `Group.ReadWrite.All`; Entra role usually needed: Groups Administrator.
+- For Read tenant SKUs and licence assignments — least-privilege delegated scope `LicenseAssignment.Read.All` (or `Organization.Read.All`); Entra role usually needed: Global Reader / Directory Readers.
+- For Assign or remove licences — least-privilege delegated scope `LicenseAssignment.ReadWrite.All`; Entra role usually needed: License Administrator.
+- For Read sign-in and directory audit logs — least-privilege delegated scope `AuditLog.Read.All`; Entra role usually needed: Reports Reader / Security Reader.
+- For Read usage reports — least-privilege delegated scope `Reports.Read.All`; Entra role usually needed: Reports Reader.
+- For Read Conditional Access policies — least-privilege delegated scope `Policy.Read.All`; Entra role usually needed: Global Reader / Security Reader.
+- For Write Conditional Access policies — least-privilege delegated scope `Policy.ReadWrite.ConditionalAccess`; Entra role usually needed: Conditional Access Administrator.
+- For Read role assignments — least-privilege delegated scope `RoleManagement.Read.Directory`; Entra role usually needed: Global Reader.
+- For Assign directory roles — least-privilege delegated scope `RoleManagement.ReadWrite.Directory`; Entra role usually needed: Privileged Role Administrator.
+- For Read auth method registration — least-privilege delegated scope `AuditLog.Read.All` (report) or `UserAuthenticationMethod.Read.All` (per user); Entra role usually needed: Authentication Administrator.
+- For Read apps / service principals — least-privilege delegated scope `Application.Read.All`; Entra role usually needed: Global Reader.
+- For Read devices — least-privilege delegated scope `Device.Read.All`; Entra role usually needed: Global Reader.
+- For Read SharePoint sites via Graph — least-privilege delegated scope `Sites.Read.All`; Entra role usually needed: SharePoint Administrator.
+
+## Admin roles by workload
+
+- Exchange Online, EOP: the admin role that works is Exchange Administrator (Graph name: Exchange Service Administrator). Read-only equivalent: Global Reader (Exchange Recipient Administrator is write, not read-only).
+- Purview / compliance: the admin role that works is Compliance Administrator, Compliance Data Administrator; plus a Purview role group (eDiscovery Manager, Organization Management). Read-only equivalent: Global Reader.
+- Teams: the admin role that works is Teams Administrator; Teams Communications Administrator for voice only. Read-only equivalent: Teams Communications Support Specialist, Global Reader.
+- SharePoint / OneDrive: the admin role that works is SharePoint Administrator. Read-only equivalent: Global Reader.
+- Users, groups, licences: the admin role that works is User Administrator; License Administrator for licences only; Groups Administrator for groups. Read-only equivalent: Directory Readers, Global Reader.
+- Sign-in / audit / reports: the admin role that works is Reports Reader, Security Reader. Read-only equivalent: same.
+- Conditional Access, auth methods: the admin role that works is Conditional Access Administrator, Authentication Policy Administrator. Read-only equivalent: Global Reader.
+- Role assignments, PIM: the admin role that works is Privileged Role Administrator. Read-only equivalent: Global Reader.
+
+## Licence SKUs
+
+`SkuPartNumber` is the string you see in PowerShell; `SkuId` is the GUID Graph wants.
+
+- Microsoft 365 E3 has SkuPartNumber `SPE_E3` and SkuId `05e9a617-0261-4cee-bb44-138d3ef5d965`.
+- Microsoft 365 E5 has SkuPartNumber `SPE_E5` and SkuId `06ebc4ee-1bb5-47dd-8120-11324bc54e06`.
+- Office 365 E3 has SkuPartNumber `ENTERPRISEPACK` and SkuId `6fd2c87f-b296-42f0-b197-1e91e994b900`.
+- Office 365 E5 has SkuPartNumber `ENTERPRISEPREMIUM` and SkuId `c7df2760-2c81-4ef7-b578-5b5392b571df`.
+- Microsoft 365 Business Premium has SkuPartNumber `SPB` and SkuId `cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46`.
+- Microsoft 365 F3 has SkuPartNumber `SPE_F1` and SkuId `66b55226-6b4f-492c-910c-a3b7a3c9d993`.
+- Office 365 F3 has SkuPartNumber `DESKLESSPACK` and SkuId `4b585984-651b-448a-9e53-3b10f069cf7f`.
+- Exchange Online (Plan 1) has SkuPartNumber `EXCHANGESTANDARD` and SkuId `4b9405b0-7788-4568-add1-99614e613b69`.
+- Exchange Online (Plan 2) has SkuPartNumber `EXCHANGEENTERPRISE` and SkuId `19ec0d23-8335-4cbd-94ac-6050e30712fa`.
+- Microsoft Teams Phone Standard has SkuPartNumber `MCOEV` and SkuId `e43b5b99-8dfb-405f-9987-dc307f34bcbd`.
+- Power BI Pro has SkuPartNumber `POWER_BI_PRO` and SkuId `f8a1db68-be16-40ed-86d5-cb42ce701560`.
+- Microsoft Entra ID P1 has SkuPartNumber `AAD_PREMIUM` and SkuId `078d2b04-f1bd-4111-bbd4-b4b1b354cef4`.
+- Microsoft Entra ID P2 has SkuPartNumber `AAD_PREMIUM_P2` and SkuId `84a661c4-e949-4bd2-a560-ed7766fcaf2b`.
+
+Common service plans inside them: `EXCHANGE_S_ENTERPRISE`, `SHAREPOINTENTERPRISE`, `TEAMS1`, `OFFICESUBSCRIPTION`, `AAD_PREMIUM`, `MCOEV`, `BI_AZURE_P2`, `INTUNE_A`.
+
+### Reference: modules, cmdlet map, scopes, roles, licence SKUs — Resolve the SKUs in your own tenant
+Command:
+    Get-MgSubscribedSku -All | Select-Object SkuPartNumber,SkuId,ConsumedUnits,@{n='Enabled';e={$_.PrepaidUnits.Enabled}}
+
+### Reference: modules, cmdlet map, scopes, roles, licence SKUs — List the service plans inside one SKU
+Command:
+    (Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq 'SPE_E3').ServicePlans | Select-Object ServicePlanName,ServicePlanId
