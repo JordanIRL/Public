@@ -75,8 +75,11 @@ Assert 'and it is the USER probe' ($asUser.name -like '*(USER)') "(got '$($asUse
 Write-Host "`n5. No reboot commands" -ForegroundColor Cyan
 foreach ($s in $scripts) {
     if ($s.FullName -like "*$([IO.Path]::DirectorySeparatorChar)tests$([IO.Path]::DirectorySeparatorChar)*") { continue }
-    $body = (Get-Content $s.FullName -Raw) -split "`n" |
-        Where-Object { $_ -notmatch '^\s*#' } | Join-String -Separator "`n"
+    # -join rather than Join-String: the latter is PowerShell 7 only, and this file is
+    # the first thing a Windows admin runs - failing under powershell.exe 5.1 with
+    # 'term not recognized' is a bad first impression of a kit about not guessing.
+    $body = ((Get-Content $s.FullName -Raw) -split "`n" |
+        Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
     Assert "no reboot in $($s.Name)" ($body -notmatch 'Restart-Computer|shutdown\.exe|shutdown\s+/r')
 }
 
