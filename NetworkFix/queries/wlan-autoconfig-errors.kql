@@ -1,0 +1,8 @@
+// WLAN-AutoConfig errors and warnings in the last day: disconnects, auth failures,
+// roaming churn. Frequent reconnects starve TCP of the steady state it needs to
+// build a receive window, and look like sustained slow downloads to the user.
+WindowsEvent('Microsoft-Windows-WLAN-AutoConfig/Operational', 1d)
+| where Level == 'ERROR' or Level == 'WARNING'
+| project LoggedDateTime, Level, EventId, Message
+| order by LoggedDateTime desc
+| take 40

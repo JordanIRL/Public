@@ -1,0 +1,104 @@
+{
+  "$comment": [
+    "Manifest for Invoke-Deploy.ps1. runAs32Bit is FALSE on every package - that is the",
+    "single most important setting here. The Intune portal defaults to 32-bit, and a 32-bit",
+    "PowerShell host on 64-bit Windows hits WOW64 registry redirection, so the native",
+    "Uninstall hive and several net cmdlets return wrong or empty data. The fingerprint",
+    "still renders; it is just quietly incorrect.",
+    "",
+    "Assignment is deliberately NOT automated - see Invoke-Deploy.ps1 header."
+  ],
+  "publisher": "IT Operations",
+  "packages": [
+    {
+      "name": "Network Triage - Fingerprint (SYSTEM)",
+      "description": "Collects Wi-Fi/TCP/driver/filter fingerprint, runs bounded single vs parallel throughput probe, emits a VERDICT. Detection-only: exit 1 means an actionable verdict was reached.",
+      "detection": "src/Detect-NetworkFingerprint.ps1",
+      "remediation": null,
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "on-demand or daily",
+      "notes": "Start here. Assign to a pilot group containing one KNOWN-GOOD device first to capture a baseline."
+    },
+    {
+      "name": "Network Triage - Fingerprint (USER)",
+      "description": "User-context companion probe. Exposes per-user proxy/AV differences that SYSTEM cannot see. Diagnostic only, always exits 0.",
+      "detection": "src/Detect-NetworkFingerprint.User.ps1",
+      "remediation": null,
+      "runAsAccount": "user",
+      "runAs32Bit": false,
+      "schedule": "on-demand",
+      "notes": "Deploy only when the SYSTEM probe reports HEALTHY against a live user complaint."
+    },
+    {
+      "name": "Network Fix - TCP Autotuning",
+      "description": "Restores normal TCP receive-window auto-tuning. Least disruptive fix in the kit: no reboot, no adapter bounce.",
+      "detection": "remediations/TcpAutotuning/Detect-TcpAutotuning.ps1",
+      "remediation": "remediations/TcpAutotuning/Remediate-TcpAutotuning.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "daily",
+      "notes": "Safe to run fleet-wide on a schedule."
+    },
+    {
+      "name": "Network Fix - Wi-Fi Power Management",
+      "description": "Disables radio power-down and sets the wireless power plan to maximum performance.",
+      "detection": "remediations/WifiPowerManagement/Detect-WifiPowerManagement.ps1",
+      "remediation": "remediations/WifiPowerManagement/Remediate-WifiPowerManagement.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "daily",
+      "notes": "May bounce the adapter (few seconds offline) IF selective suspend is wrong. Other changes apply live."
+    },
+    {
+      "name": "Network Fix - Bandwidth Managers",
+      "description": "Uninstalls allowlisted OEM bandwidth managers (SmartByte, Killer suite). Reports but never removes Dell Optimizer / SupportAssist.",
+      "detection": "remediations/BandwidthManagers/Detect-BandwidthManagers.ps1",
+      "remediation": "remediations/BandwidthManagers/Remediate-BandwidthManagers.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "on-demand first",
+      "notes": "Run detection alone first - it doubles as the dry run and prints exactly what would be removed."
+    },
+    {
+      "name": "Network Fix - WLAN Profile Refresh",
+      "description": "Refreshes the active WLAN profile in place and prunes stale non-active profiles. Never deletes the profile carrying the connection.",
+      "detection": "remediations/WlanProfileRefresh/Detect-WlanProfileRefresh.ps1",
+      "remediation": "remediations/WlanProfileRefresh/Remediate-WlanProfileRefresh.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "on-demand",
+      "notes": "Refresh-in-place by design: delete-then-recreate can strand a remote device with no Wi-Fi."
+    },
+    {
+      "name": "Network Audit - Filter Drivers",
+      "description": "Reports non-baseline NDIS bindings, third-party Winsock LSPs, and running inline inspection services. Detection-only, always exits 0.",
+      "detection": "remediations/FilterDriverAudit/Detect-FilterDriverAudit.ps1",
+      "remediation": null,
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "on-demand",
+      "notes": "Intentionally has no remediation - auto-unbinding a filter driver can sever connectivity."
+    },
+    {
+      "name": "Network Fix - Wi-Fi Driver Update",
+      "description": "Applies Dell network-category driver updates only, via dcu-cli, with reboot suppressed.",
+      "detection": "remediations/WifiDriverUpdate/Detect-WifiDriverUpdate.ps1",
+      "remediation": "remediations/WifiDriverUpdate/Remediate-WifiDriverUpdate.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "on-demand",
+      "notes": "Requires Dell Command | Update installed. Records before/after driver version."
+    },
+    {
+      "name": "Network Fix - Stack Reset (ON-DEMAND ONLY)",
+      "description": "Winsock + IP stack reset. Requires a reboot to fully apply. Heavy hammer - last software step before the Stopping Rule.",
+      "detection": "remediations/NetworkStackReset/Detect-NetworkStackReset.ps1",
+      "remediation": "remediations/NetworkStackReset/Remediate-NetworkStackReset.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "NEVER SCHEDULE",
+      "notes": "Do not assign to a group. A 7-day per-device cooldown limits the blast radius of a mis-assignment."
+    }
+  ]
+}

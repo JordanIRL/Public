@@ -1,0 +1,14 @@
+// Running services that inspect traffic inline. These slow the receive path far more
+// than the send path, matching the slow-download / fast-upload signature.
+// Presence is NOT a fault on its own - most fleets legitimately run one of these.
+WindowsService
+| where State == 'RUNNING'
+| where DisplayName contains 'Netskope'
+    or DisplayName contains 'Zscaler'
+    or DisplayName contains 'Umbrella'
+    or DisplayName contains 'Forcepoint'
+    or DisplayName contains 'SentinelOne'
+    or DisplayName contains 'CrowdStrike'
+    or DisplayName contains 'FortiClient'
+    or DisplayName contains 'GlobalProtect'
+| project DisplayName, ServiceName, State, StartMode, Path

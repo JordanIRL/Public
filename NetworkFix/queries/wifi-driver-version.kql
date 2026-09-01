@@ -1,0 +1,8 @@
+// Wi-Fi driver version, provider and date.
+// Cross-check against Intel's current release - Dell OEM builds routinely lag by months,
+// and specific AX201/AX211 builds produce collapsed receive throughput with healthy TX.
+WindowsDriver
+| where Class == 'Net'
+| where DriverDescription contains 'Wireless' or DriverDescription contains 'Wi-Fi' or DriverDescription contains '802.11'
+| project FriendlyName, DriverDescription, DriverVersion, ProviderName, BuildDate, Signed, InfName
+| order by BuildDate asc

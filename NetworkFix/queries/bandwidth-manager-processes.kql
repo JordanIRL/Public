@@ -1,0 +1,11 @@
+// Running OEM bandwidth managers. A hit here plus THRU ratio ~= 1 in the fingerprint
+// is a strong HARD_CAP signal.
+// Detects the running process, which the Uninstall-hive check can miss if the product
+// was partially removed and left its service behind.
+Process
+| where ProcessName contains 'SmartByte'
+    or ProcessName contains 'Killer'
+    or ProcessName contains 'RivetNetworks'
+    or ProcessName contains 'DellOptimizer'
+    or ProcessName contains 'ExpressConnect'
+| project ProcessName, Path, WindowsUserAccount, ElapsedTimeMilliseconds, WorkingSetSizeBytes
