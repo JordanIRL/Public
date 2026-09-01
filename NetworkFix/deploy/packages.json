@@ -41,6 +41,16 @@
       "notes": "Safe to run fleet-wide on a schedule."
     },
     {
+      "name": "Network Fix - Settings Reset",
+      "description": "Resets the Wi-Fi adapter's advanced properties to their driver defaults in a single adapter bounce. Reports static IP/DNS, WinHTTP proxy and persistent routes without changing them.",
+      "detection": "remediations/NetworkSettingsReset/Detect-NetworkSettingsReset.ps1",
+      "remediation": "remediations/NetworkSettingsReset/Remediate-NetworkSettingsReset.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "on-demand",
+      "notes": "ORDER MATTERS: run this BEFORE Wi-Fi Power Management. Driver defaults include power saving, so this undoes that pair. Bounces the adapter (few seconds offline); 24-hour per-device cooldown."
+    },
+    {
       "name": "Network Fix - Wi-Fi Power Management",
       "description": "Disables radio power-down and sets the wireless power plan to maximum performance.",
       "detection": "remediations/WifiPowerManagement/Detect-WifiPowerManagement.ps1",
@@ -89,6 +99,16 @@
       "runAs32Bit": false,
       "schedule": "on-demand",
       "notes": "Requires Dell Command | Update installed. Records before/after driver version."
+    },
+    {
+      "name": "Network Fix - Driver Reinstall (ON-DEMAND ONLY)",
+      "description": "Removes and re-detects the Wi-Fi adapter, reinstalling its driver from the local driver store. Exports and restores the active WLAN profile, and arms a boot watchdog before touching the device.",
+      "detection": "remediations/NetworkDriverReinstall/Detect-NetworkDriverReinstall.ps1",
+      "remediation": "remediations/NetworkDriverReinstall/Remediate-NetworkDriverReinstall.ps1",
+      "runAsAccount": "system",
+      "runAs32Bit": false,
+      "schedule": "NEVER SCHEDULE",
+      "notes": "Highest-risk package in the kit - the only one that can strand a remote device. Do not assign to a group. Detection is a hard preflight and exits 1 only when every safety precondition passes; a 14-day per-device cooldown limits the blast radius of a mis-assignment."
     },
     {
       "name": "Network Fix - Stack Reset (ON-DEMAND ONLY)",

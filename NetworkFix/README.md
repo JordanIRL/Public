@@ -44,10 +44,11 @@ One test, no guessing, half the problem space gone.
 ```
 src/                  Detect-NetworkFingerprint.ps1        triage collector + verdict engine
                       Detect-NetworkFingerprint.User.ps1   user-context companion probe
-remediations/         seven narrow, idempotent Detect/Remediate pairs
+remediations/         nine narrow, idempotent Detect/Remediate pairs
 deploy/               packages.json, Invoke-Deploy.ps1, Get-RemediationResults.ps1
 queries/              Device Query KQL snippets
-tests/                Test-Fingerprint.ps1  (runs anywhere pwsh runs)
+tests/                Test-Fingerprint.ps1  output budget + parser round-trip
+                      Test-Packages.ps1     deployment invariants (both run anywhere pwsh runs)
 ```
 
 Every `.ps1` is self-contained and pasteable straight into the portal. That means a little
@@ -125,6 +126,38 @@ a surprise reboot is exactly the disruption this kit avoids. `Stack Reset` write
 `PendingReboot` marker under `HKLM:\SOFTWARE\NetworkFix`; issue the reboot with the Intune
 Restart action or let it land naturally.
 
+**Reset and reinstall are two different actions, and the kit keeps them apart.** The
+Windows *Settings > Network reset* button does both at once: it resets networking
+components to their original settings *and* removes and reinstalls the adapters. Bundled
+together on a remote device that is one operation with two failure modes and no way to
+tell which half helped. Split:
+- **Settings Reset** returns the Wi-Fi adapter's *advanced properties* to their driver
+  defaults. Nothing else in the kit inspects them as a whole, and a mangled
+  `*ReceiveBuffers`, `*RSS` or `*FlowControl` caps inbound throughput while leaving
+  transmit alone - the signature this kit chases. Applies live, one adapter bounce.
+- **Driver Reinstall** removes the adapter and re-detects it, rebinding the driver from
+  the local store. Distinct from **Wi-Fi Driver Update**, which is forward-only: update
+  fixes *"the driver is too old"*, reinstall fixes *"the driver is the right version but
+  its installed state is wrong"*, and it is the only path back when the device is already
+  on the newest Dell build and that build is the bad one.
+
+**Driver Reinstall is the highest-risk package here** - higher than Stack Reset, which
+needs a reboot but cannot strand a device. Removing a Wi-Fi adapter from a laptop with no
+hands on it and no wired fallback has three ways to end in a site visit, and each is
+gated explicitly: the backing INF is verified present in the driver store *before* the
+removal (re-detection rebinds locally, with no network involved); a one-shot boot
+watchdog task is registered *first*, so a mid-flight death costs a reboot rather than a
+visit; and the active WLAN profile is exported and re-added afterwards, because removing
+the device can change the interface GUID and orphan the profiles stored against the old
+one. If the export fails and there is no wired fallback, it aborts without touching the
+device. Its detection script is a hard preflight - it exits 1 only when every one of
+those preconditions passes.
+
+**Settings Reset must run before Wi-Fi Power Management, never after.** Driver defaults
+include power saving, so resetting to defaults undoes the Power Management pair by
+construction. The remediation ends its output with `RERUN=WifiPowerManagement` and a
+24-hour cooldown stops a mis-assignment fighting that pair on every check-in.
+
 **Two things are deliberately not automated:**
 - **Filter Driver Audit has no remediation.** Auto-unbinding a filter driver can sever
   connectivity on a remote device, and the right fix depends on which product it is.
@@ -160,11 +193,34 @@ inline inspection services, WLAN event errors.
   prefer the `retx` ratio, which is normalised.
 - **Wi-Fi Driver Update needs Dell Command | Update** installed; it reports `dcu=missing`
   otherwise.
+- **Driver Reinstall needs Windows 10 2004 / build 19041 or later** for
+  `pnputil /remove-device`; it reports `blocked|os=unsupported` on anything older. It
+  also expects the driver to have come from a store package - a device running an inbox
+  driver reinstalls the inbox driver, which is correct but rarely what you wanted.
+- **Settings Reset only sees properties the INF declares a default for.** A property with
+  no declared default cannot be shown to have drifted, so it is skipped rather than
+  guessed at.
 - Requires Windows Enterprise E3/E5 (or equivalent) for Remediations; Device Query
   additionally requires the Intune Suite add-on.
 
 ## Tests
 
+Neither test needs Windows - both run anywhere `pwsh` runs.
+
 ```bash
 pwsh -NoProfile -File tests/Test-Fingerprint.ps1
 ```
+
+Output budget and the CSV parser round-trip: the two things about the fingerprint that
+break silently rather than loudly.
+
+```bash
+pwsh -NoProfile -File tests/Test-Packages.ps1
+```
+
+Deployment invariants - the manifest resolves, every script parses and is BOM-free,
+`runAs32Bit` is false everywhere, only the USER probe runs in user context, no script
+contains a reboot command, every package with a remediation has a detection that can
+actually reach `exit 1`, every `NEVER SCHEDULE` package carries a cooldown guard, no
+script is orphaned, and no two packages share an output tag. Run it before every
+`Invoke-Deploy.ps1`.

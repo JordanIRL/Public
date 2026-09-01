@@ -1,0 +1,18 @@
+# Exported WLAN profiles. 'netsh wlan export profile ... key=clear' writes the PSK in
+# CLEAR TEXT. Both WLAN Profile Refresh and Driver Reinstall export one, and both delete
+# it again immediately - but a copy pulled onto a workstation for debugging must never
+# reach a commit. This pattern is the backstop.
+*.xml
+
+# Fleet results from Get-RemediationResults.ps1. Every row carries a device name and a
+# userPrincipalName, so these are personal data, not build output.
+*.csv
+triage.csv
+
+# dcu-cli and probe logs written under ProgramData; only ever here by accident.
+*.log
+dcu-scan.log
+dcu-apply.log
+
+.DS_Store
+Thumbs.db
